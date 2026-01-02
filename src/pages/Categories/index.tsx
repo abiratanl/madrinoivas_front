@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { categoryService, Category } from '../../services/categoryService';
+import { categoryService, type Category } from '../../services/categoryService';
 
-export function Categories() {
+ function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -97,3 +97,4 @@ export function Categories() {
     </div>
   );
 }
+export default Categories;

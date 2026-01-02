@@ -29,8 +29,8 @@ const Categories = lazy(() => import('../pages/Categories'));
 const CategoryForm = lazy(() => import('../pages/CategoryForm'));
 
 // === FUTURAS PÁGINAS (PRODUTOS) ===
-// const Products = lazy(() => import('../pages/Products'));
-// const ProductForm = lazy(() => import('../pages/ProductForm'));
+const Products = lazy(() => import('../pages/Products'));
+const ProductForm = lazy(() => import('../pages/ProductForm'));
 
 // Simple Loading Component
 const Loading = () => (

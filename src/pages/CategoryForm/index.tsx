@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { categoryService } from '../../services/categoryService';
 
-export function CategoryForm() {
+function CategoryForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   
@@ -104,3 +104,5 @@ export function CategoryForm() {
     </div>
   );
 }
+export default CategoryForm;
+
