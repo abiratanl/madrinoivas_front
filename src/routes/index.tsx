@@ -8,28 +8,39 @@ import { AuthLayout } from '../components/layouts/AuthLayout';
 // Security Guard Import
 import { PrivateRoute } from '../components/PrivateRoute';
 
-// Lazy Loading Pages
-const ChangePassword = lazy(() => import('../pages/ChangePassword'));
-const ClientPage = lazy(() => import('../pages/Clients')); 
-const Dashboard = lazy(() => import('../pages/Dashboard'));
-const Home = lazy(() => import('../pages/Home')); // Landing Page Pública
-const Login = lazy(() => import('../pages/Login'));
-const NotFound = lazy(() => import('../pages/NotFound'));
-const Rentals = lazy(() => import('../pages/Rentals'));
-const Users = lazy(() => import('../pages/Users')); 
+// --- Lazy Loading Pages ---
 
+// Public & Auth
+const Home = lazy(() => import('../pages/Home'));
+const Login = lazy(() => import('../pages/Login'));
 const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('../pages/ResetPassword'));
+const ChangePassword = lazy(() => import('../pages/ChangePassword'));
+const NotFound = lazy(() => import('../pages/NotFound'));
+
+// Admin / System Pages
+const Dashboard = lazy(() => import('../pages/Dashboard'));
+const Users = lazy(() => import('../pages/Users')); 
+const ClientPage = lazy(() => import('../pages/Clients')); 
+const Rentals = lazy(() => import('../pages/Rentals'));
+
+// === NOVAS PÁGINAS (CATEGORIAS) ===
+const Categories = lazy(() => import('../pages/Categories'));
+const CategoryForm = lazy(() => import('../pages/CategoryForm'));
+
+// === FUTURAS PÁGINAS (PRODUTOS) ===
+// const Products = lazy(() => import('../pages/Products'));
+// const ProductForm = lazy(() => import('../pages/ProductForm'));
 
 // Simple Loading Component
 const Loading = () => (
   <div className="flex items-center justify-center h-screen bg-gray-50">
-    <div className="animate-pulse text-blue-600 font-semibold">Carregando...</div>
+    <div className="animate-pulse text-rose-600 font-semibold">Carregando...</div>
   </div>
 );
 
 export const router = createBrowserRouter([
-  // 1. PUBLIC ROUTE (LANDING PAGE)
+  // 1. PUBLIC ROUTE
   {
     path: "/",
     element: (
@@ -52,7 +63,6 @@ export const router = createBrowserRouter([
           </Suspense>
         )
       },
-      // --- RECOVERY ROUTES ---
       {
         path: "forgot-password",
         element: (
@@ -62,14 +72,13 @@ export const router = createBrowserRouter([
         )
       },
       {
-        path: "reset-password/:token", // The :token captures the URL code.
+        path: "reset-password/:token",
         element: (
           <Suspense fallback={<Loading />}>
             <ResetPassword />
           </Suspense>
         )
       },
-      // ----------------------------------
       {
         path: "change-password",
         element: (
@@ -83,11 +92,9 @@ export const router = createBrowserRouter([
 
   // 3. PRIVATE SYSTEM ROUTES
   {
-    // Level 1 Guard: Only checks if you are logged in.
     element: <PrivateRoute />, 
     children: [
       {
-        // LAYOUT: Side Menu and Topbar appear here
         element: <AppLayout />, 
         children: [
           
@@ -121,7 +128,8 @@ export const router = createBrowserRouter([
             ]
           },
 
-          // --- OPERATIONAL AREA (Admin, Owner and Attendant)) ---
+          // --- OPERATIONAL AREA (Admin, Owner, Attendant) ---
+          // Aqui entram Aluguéis, Categorias e Produtos
           {
             element: <PrivateRoute allowedRoles={['admin', 'proprietario', 'atendente']} />,
             children: [
@@ -132,11 +140,50 @@ export const router = createBrowserRouter([
                     <Rentals />
                   </Suspense>
                 )
+              },
+              // === ROTAS DE CATEGORIAS ===
+              {
+                path: "/categories",
+                element: (
+                  <Suspense fallback={<Loading />}>
+                    <Categories />
+                  </Suspense>
+                )
+              },
+              {
+                path: "/categories/new",
+                element: (
+                  <Suspense fallback={<Loading />}>
+                    <CategoryForm />
+                  </Suspense>
+                )
+              },
+              {
+                path: "/categories/edit/:id",
+                element: (
+                  <Suspense fallback={<Loading />}>
+                    <CategoryForm />
+                  </Suspense>
+                )
+              },
+              /* // === ROTAS DE PRODUTOS (Descomentar quando criarmos os arquivos) ===
+              {
+                path: "/products",
+                element: (<Suspense fallback={<Loading />}><Products /></Suspense>)
+              },
+              {
+                path: "/products/new",
+                element: (<Suspense fallback={<Loading />}><ProductForm /></Suspense>)
+              },
+              {
+                path: "/products/edit/:id",
+                element: (<Suspense fallback={<Loading />}><ProductForm /></Suspense>)
               }
+              */
             ]
           },
 
-          // --- CUSTOMER AREA (Customer Only) ---
+          // --- CUSTOMER AREA ---
           {
             element: <PrivateRoute allowedRoles={['cliente']} />,
             children: [
