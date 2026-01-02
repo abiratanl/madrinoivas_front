@@ -1,0 +1,12 @@
+services:
+  frontend:
+    build: .
+    container_name: frontend-boilerplate-react
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app            # Syncs your local folder to the container
+      - /app/node_modules # Prevents local node_modules from overriding the container's
+    environment:
+      # Secure connection via Nginx (no port, as it uses the standard 443)
+      - VITE_API_URL=https://abiratan.cloud
