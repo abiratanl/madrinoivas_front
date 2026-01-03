@@ -4,20 +4,19 @@ export interface Category {
   id: number;
   name: string;
   description?: string;
-  parent_id?: number | null; // Para subcategorias
+  parent_id?: number | null;
 }
 
 export const categoryService = {
-  // GET / (Public or Protected)
-  getAll: async () => {
+  // ADICIONAMOS ': Promise<Category[]>' para o TypeScript entender que devolve uma lista
+  getAll: async (): Promise<Category[]> => {
     const response = await api.get('/categories');
-    return response.data; // Retorna { status: 'success', data: [...] }
-  },
-
-  // GET /:id
-  getById: async (id: number | string) => {
-    const response = await api.get(`/categories/${id}`);
-    return response.data;
+    
+    // CORREÇÃO: Pegamos o .data interno onde está a lista real
+    // Se o seu backend retorna { status: 'success', data: [...] }, usamos response.data.data
+    // Se retornar direto [...], usamos response.data
+    // O código abaixo cobre os dois casos:
+    return response.data.data || response.data || []; 
   },
 
   // POST / (Protected)
