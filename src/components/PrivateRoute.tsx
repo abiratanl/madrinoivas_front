@@ -2,35 +2,41 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface PrivateRouteProps {
-  allowedRoles?: string[]; // Array opcional de permissões (ex: ['admin', 'proprietario'])
+  allowedRoles?: string[];
 }
 
 export const PrivateRoute = ({ allowedRoles }: PrivateRouteProps) => {
   const { signed, loading, user } = useAuth();
 
-  // 1. Loading State
+  // 1. Aguarda o carregamento do LocalStorage antes de decidir
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-4 border-rose-600"></div>
       </div>
     );
   }
 
-  // 2. Not Logged In -> Redirect to Login
-  // Ajustei o caminho para "/" que geralmente é o Login, ou mude para "/login" se preferir
-  if (!signed) {
-    return <Navigate to="/" replace />;
+  // 2. Se não estiver logado -> Redireciona para Login (ou Raiz)
+  if (!signed || !user) {
+    return <Navigate to="/auth/login" replace />;
   }
 
-  // 3. Role Based Access Control (RBAC)
-  // Se a rota exige roles específicas E o usuário não tem a role necessária...
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    console.warn(`Acesso negado: Usuário ${user.role} tentou acessar rota restrita a ${allowedRoles}`);
-    // Redireciona para uma página segura (Home ou Dashboard do usuário)
-    return <Navigate to="/home" replace />;
+  // 3. Validação de Permissões (RBAC)
+  if (allowedRoles && allowedRoles.length > 0) {
+    // Normaliza para lowercase para evitar erros (Admin vs admin)
+    const userRole = user.role?.toLowerCase();
+    
+    // Verifica se a role do usuário está na lista de permitidos
+    // Nota: allowedRoles também deve estar em lowercase no arquivo de rotas
+    if (!allowedRoles.includes(userRole)) {
+      console.warn(`⛔ Acesso negado. Usuário: ${userRole}, Rota exige: ${allowedRoles}`);
+      
+      // Redireciona para a raiz (Dashboard ou Home pública)
+      return <Navigate to="/" replace />;
+    }
   }
 
-  // 4. Authorized -> Render content
+  // 4. Autorizado -> Renderiza a página
   return <Outlet />;
 };

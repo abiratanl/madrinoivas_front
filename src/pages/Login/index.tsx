@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useLogin } from '../../hooks/useLogin';
 
-export default function Login() {
+function Login() {
   // Lógica de UI: Inicializa verificando o localStorage ou preferência do sistema
   const [darkMode, setDarkMode] = useState(() => {
     // 1. Verifica se já existe algo salvo
@@ -144,3 +144,5 @@ export default function Login() {
     </div>
   );
 }
+export default Login;
+//

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { authService } from "../../services/authService";
 
-export default function ForgotPassword() {
+function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
@@ -82,3 +82,4 @@ export default function ForgotPassword() {
     </div>
   );
 }
+export default ForgotPassword;

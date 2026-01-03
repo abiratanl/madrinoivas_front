@@ -1,21 +1,20 @@
-// src/contexts/AuthContext.tsx
-// Adicione 'type' antes de ReactNode
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { api } from '../services/api'; // Usamos a instância global configurada
+import { api } from '../services/api';
 
 interface User {
   id: number;
   name: string;
   email: string;
   role: string;
+  avatar?: string;
 }
 
 interface AuthContextType {
   signed: boolean;
   user: User | null;
   loading: boolean;
-  // A função signIn apenas "avisa" o contexto que o login ocorreu
-  signIn: (user: User, token: string) => void; 
+  // CORREÇÃO: A ordem agora é (token, user) para bater com o useLogin
+  signIn: (token: string, user: User) => void;
   signOut: () => void;
 }
 
@@ -27,13 +26,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loadStorageData = async () => {
-      // Padronizando as chaves para evitar confusão (sem o prefixo @App)
-      const storagedToken = localStorage.getItem('token');
-      const storagedUser = localStorage.getItem('user');
+      // Usando chaves específicas para evitar conflito com outros apps em localhost
+      const storagedToken = localStorage.getItem('@MadriNoivas:token');
+      const storagedUser = localStorage.getItem('@MadriNoivas:user');
 
       if (storagedToken && storagedUser) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${storagedToken}`;
-        setUser(JSON.parse(storagedUser));
+        try {
+          const parsedUser = JSON.parse(storagedUser);
+          api.defaults.headers.common['Authorization'] = `Bearer ${storagedToken}`;
+          setUser(parsedUser);
+        } catch (error) {
+          console.error("Erro ao ler dados do storage", error);
+          signOut();
+        }
       }
       setLoading(false);
     };
@@ -41,22 +46,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadStorageData();
   }, []);
 
-  const signIn = (userData: User, token: string) => {
+  // CORREÇÃO: token primeiro, user depois
+  const signIn = (token: string, userData: User) => {
     // 1. Configura Axios Global
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     
-    // 2. Persiste
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    // 2. Persiste com nomes de chave seguros
+    localStorage.setItem('@MadriNoivas:token', token);
+    localStorage.setItem('@MadriNoivas:user', JSON.stringify(userData));
     
-    // 3. Atualiza Estado (Isso faz o Sidebar mudar!)
+    // 3. Atualiza Estado
     setUser(userData);
+    console.log("🔐 Contexto: Login realizado com sucesso para role:", userData.role);
   };
 
   const signOut = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    api.defaults.headers.common['Authorization'] = undefined;
+    localStorage.removeItem('@MadriNoivas:user');
+    localStorage.removeItem('@MadriNoivas:token');
+    
+    // Importante: limpar o header para evitar erros em requisições futuras
+    delete api.defaults.headers.common['Authorization'];
+    
     setUser(null);
   };
 

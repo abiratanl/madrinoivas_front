@@ -38,7 +38,7 @@ export function useLogin() {
 
             // 2. SUCESSO: Chama o signIn do Contexto
             // Isso salva no storage E atualiza o Sidebar instantaneamente
-            signIn(user, token);
+            signIn(token, user);
 
             console.log(`✅ Login efetuado: ${user.role}`);
 
@@ -58,7 +58,7 @@ export function useLogin() {
                      break;
                 default:
                     console.warn("⚠️ Role desconhecida.");
-                    navigate('/home');
+                    navigate('/'); // <--- Mande para a raiz
             }
 
         } catch (err: any) {
@@ -72,7 +72,9 @@ export function useLogin() {
                 if (code === 'PASSWORD_CHANGE_REQUIRED') {
                     // Redireciona para troca de senha levando o token temporário
                     navigate('/auth/change-password', { 
-                        state: { tempToken: token } 
+                        state: { tempToken: token,
+                                 email: email
+                        } 
                     });
                     return; // Para a execução aqui
                 }

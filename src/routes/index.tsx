@@ -9,28 +9,29 @@ import { AuthLayout } from '../components/layouts/AuthLayout';
 import { PrivateRoute } from '../components/PrivateRoute';
 
 // --- Lazy Loading Pages ---
+// Adicionamos '/index' explicitamente para evitar erros de importação com o lazy
 
 // Public & Auth
-const Home = lazy(() => import('../pages/Home'));
-const Login = lazy(() => import('../pages/Login'));
-const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('../pages/ResetPassword'));
-const ChangePassword = lazy(() => import('../pages/ChangePassword'));
-const NotFound = lazy(() => import('../pages/NotFound'));
+const Home = lazy(() => import('../pages/Home/index'));
+const Login = lazy(() => import('../pages/Login/index'));
+const ForgotPassword = lazy(() => import('../pages/ForgotPassword/index'));
+const ResetPassword = lazy(() => import('../pages/ResetPassword/index'));
+const ChangePassword = lazy(() => import('../pages/ChangePassword/index'));
+const NotFound = lazy(() => import('../pages/NotFound/index'));
 
 // Admin / System Pages
-const Dashboard = lazy(() => import('../pages/Dashboard'));
-const Users = lazy(() => import('../pages/Users')); 
-const ClientPage = lazy(() => import('../pages/Clients')); 
-const Rentals = lazy(() => import('../pages/Rentals'));
+const Dashboard = lazy(() => import('../pages/Dashboard/index'));
+const Users = lazy(() => import('../pages/Users/index')); 
+const ClientPage = lazy(() => import('../pages/Clients/index')); 
+const Rentals = lazy(() => import('../pages/Rentals/index'));
 
-// === NOVAS PÁGINAS (CATEGORIAS) ===
-const Categories = lazy(() => import('../pages/Categories'));
-const CategoryForm = lazy(() => import('../pages/CategoryForm'));
+// === CATEGORIAS ===
+const Categories = lazy(() => import('../pages/Categories/index'));
+const CategoryForm = lazy(() => import('../pages/CategoryForm/index'));
 
-// === FUTURAS PÁGINAS (PRODUTOS) ===
-const Products = lazy(() => import('../pages/Products'));
-const ProductForm = lazy(() => import('../pages/ProductForm'));
+// === PRODUTOS (Agora habilitados) ===
+const Products = lazy(() => import('../pages/Products/index'));
+const ProductForm = lazy(() => import('../pages/ProductForm/index'));
 
 // Simple Loading Component
 const Loading = () => (
@@ -40,9 +41,18 @@ const Loading = () => (
 );
 
 export const router = createBrowserRouter([
-  // 1. PUBLIC ROUTE
+  // 1. PUBLIC ROUTE (LANDING PAGE)
   {
     path: "/",
+    element: (
+      <Suspense fallback={<Loading />}>
+        <Home />
+      </Suspense>
+    )
+  },
+  // Rota alias para /home funcionar igual a /
+  {
+    path: "/home",
     element: (
       <Suspense fallback={<Loading />}>
         <Home />
@@ -129,7 +139,6 @@ export const router = createBrowserRouter([
           },
 
           // --- OPERATIONAL AREA (Admin, Owner, Attendant) ---
-          // Aqui entram Aluguéis, Categorias e Produtos
           {
             element: <PrivateRoute allowedRoles={['admin', 'proprietario', 'atendente']} />,
             children: [
@@ -166,7 +175,7 @@ export const router = createBrowserRouter([
                   </Suspense>
                 )
               },
-              /* // === ROTAS DE PRODUTOS (Descomentar quando criarmos os arquivos) ===
+              // === ROTAS DE PRODUTOS ===
               {
                 path: "/products",
                 element: (<Suspense fallback={<Loading />}><Products /></Suspense>)
@@ -179,7 +188,6 @@ export const router = createBrowserRouter([
                 path: "/products/edit/:id",
                 element: (<Suspense fallback={<Loading />}><ProductForm /></Suspense>)
               }
-              */
             ]
           },
 

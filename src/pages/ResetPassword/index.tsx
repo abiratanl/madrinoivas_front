@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { authService } from "../../services/authService";
 
-export default function ResetPassword() {
+function ResetPassword() {
   const { token } = useParams();
   const navigate = useNavigate();
   
@@ -93,3 +93,4 @@ export default function ResetPassword() {
     </div>
   );
 }
+export default ResetPassword;
