@@ -6,6 +6,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  store_id?: string;
   avatar?: string;
 }
 
@@ -45,8 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     loadStorageData();
   }, []);
-
-  // CORREÇÃO: token primeiro, user depois
+  
   const signIn = (token: string, userData: User) => {
     // 1. Configura Axios Global
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;

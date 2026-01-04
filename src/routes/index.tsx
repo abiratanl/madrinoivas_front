@@ -9,7 +9,6 @@ import { AuthLayout } from '../components/layouts/AuthLayout';
 import { PrivateRoute } from '../components/PrivateRoute';
 
 // --- Lazy Loading Pages ---
-// Adicionamos '/index' explicitamente para evitar erros de importação com o lazy
 
 // Public & Auth
 const Home = lazy(() => import('../pages/Home/index'));
@@ -29,9 +28,12 @@ const Rentals = lazy(() => import('../pages/Rentals/index'));
 const Categories = lazy(() => import('../pages/Categories/index'));
 const CategoryForm = lazy(() => import('../pages/CategoryForm/index'));
 
-// === PRODUTOS (Agora habilitados) ===
+// === PRODUTOS ===
 const Products = lazy(() => import('../pages/Products/index'));
 const ProductForm = lazy(() => import('../pages/ProductForm/index'));
+
+// === SHOWROOM (NOVA IMPORTAÇÃO CORRETA) ===
+const Showroom = lazy(() => import('../pages/Showroom/index')); 
 
 // Simple Loading Component
 const Loading = () => (
@@ -50,7 +52,6 @@ export const router = createBrowserRouter([
       </Suspense>
     )
   },
-  // Rota alias para /home funcionar igual a /
   {
     path: "/home",
     element: (
@@ -67,35 +68,19 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "login",
-        element: (
-          <Suspense fallback={<Loading />}>
-            <Login />
-          </Suspense>
-        )
+        element: (<Suspense fallback={<Loading />}><Login /></Suspense>)
       },
       {
         path: "forgot-password",
-        element: (
-          <Suspense fallback={<Loading />}>
-            <ForgotPassword />
-          </Suspense>
-        )
+        element: (<Suspense fallback={<Loading />}><ForgotPassword /></Suspense>)
       },
       {
         path: "reset-password/:token",
-        element: (
-          <Suspense fallback={<Loading />}>
-            <ResetPassword />
-          </Suspense>
-        )
+        element: (<Suspense fallback={<Loading />}><ResetPassword /></Suspense>)
       },
       {
         path: "change-password",
-        element: (
-          <Suspense fallback={<Loading />}>
-            <ChangePassword />
-          </Suspense>
-        )
+        element: (<Suspense fallback={<Loading />}><ChangePassword /></Suspense>)
       }
     ]
   },
@@ -114,11 +99,7 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: "/dashboard", 
-                element: (
-                  <Suspense fallback={<Loading />}>
-                    <Dashboard />
-                  </Suspense>
-                )
+                element: (<Suspense fallback={<Loading />}><Dashboard /></Suspense>)
               }
             ]
           },
@@ -129,51 +110,43 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: "/users", 
-                element: (
-                  <Suspense fallback={<Loading />}>
-                    <Users />
-                  </Suspense>
-                )
+                element: (<Suspense fallback={<Loading />}><Users /></Suspense>)
               }
             ]
           },
 
           // --- OPERATIONAL AREA (Admin, Owner, Attendant) ---
+          // Aqui é o lugar perfeito para o Showroom
           {
             element: <PrivateRoute allowedRoles={['admin', 'proprietario', 'atendente']} />,
             children: [
               {
                 path: "/rentals", 
+                element: (<Suspense fallback={<Loading />}><Rentals /></Suspense>)
+              },
+              
+              // === SHOWROOM (NOVA ROTA) ===
+              {
+                path: "/showroom",
                 element: (
                   <Suspense fallback={<Loading />}>
-                    <Rentals />
+                    <Showroom />
                   </Suspense>
                 )
               },
+
               // === ROTAS DE CATEGORIAS ===
               {
                 path: "/categories",
-                element: (
-                  <Suspense fallback={<Loading />}>
-                    <Categories />
-                  </Suspense>
-                )
+                element: (<Suspense fallback={<Loading />}><Categories /></Suspense>)
               },
               {
                 path: "/categories/new",
-                element: (
-                  <Suspense fallback={<Loading />}>
-                    <CategoryForm />
-                  </Suspense>
-                )
+                element: (<Suspense fallback={<Loading />}><CategoryForm /></Suspense>)
               },
               {
                 path: "/categories/edit/:id",
-                element: (
-                  <Suspense fallback={<Loading />}>
-                    <CategoryForm />
-                  </Suspense>
-                )
+                element: (<Suspense fallback={<Loading />}><CategoryForm /></Suspense>)
               },
               // === ROTAS DE PRODUTOS ===
               {
@@ -197,11 +170,7 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: "/client-area", 
-                element: (
-                  <Suspense fallback={<Loading />}>
-                    <ClientPage />
-                  </Suspense>
-                )
+                element: (<Suspense fallback={<Loading />}><ClientPage /></Suspense>)
               }
             ]
           }                 
@@ -220,3 +189,5 @@ export const router = createBrowserRouter([
     )
   }
 ]);
+
+export default router;
