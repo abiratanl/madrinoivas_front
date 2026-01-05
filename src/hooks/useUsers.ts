@@ -1,170 +1,138 @@
-// src/hooks/useUsers.ts
 import { useState, useEffect } from 'react';
 import { userService } from '../services/userService';
 
-// --- Type Definitions ---
-
-// Represents the User object coming from the Database (MySQL)
+// --- Interfaces Alinhadas ---
 export interface User {
-  id: number;
+  id: string; // Garantindo que seja string
   name: string;
   email: string;
   role: 'admin' | 'atendente' | 'proprietario' | 'cliente';
-  is_active: boolean | number; // MySQL often returns 1 for true, 0 for false
+  is_active: boolean | number;
+  store_id: string | null; // Adicionado para sumir o erro no usr.store_id
+  store_name?: string; 
 }
 
-// Represents the Form State (ID is empty string when creating new)
 interface UserFormData {
-  id: number | ''; 
+  id: string; // Mudado de number | '' para string para bater com formData.id
   name: string;
   email: string;
   role: string;
   is_active: boolean;
+  store_id: string; 
 }
 
 export function useUsers() {
-  // --- Data State (List of Users) ---
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // --- Form State (Editing/Creating) ---
   const [isEditing, setIsEditing] = useState(false);
+
   const [formData, setFormData] = useState<UserFormData>({
-    id: '',
+    id: '', 
     name: '',
     email: '',
-    role: 'atendente', // Default role for new users
-    is_active: true
+    role: 'atendente', 
+    is_active: true,
+    store_id: '' 
   });
 
-  // --- Lifecycle ---
-  // Load users immediately when the hook is used
   useEffect(() => {
     loadUsers();
   }, []);
 
-  // --- Actions & Handlers ---
+  // No useUsers.ts, dentro de loadUsers
+const loadUsers = async () => {
+  try {
+    setLoading(true);
+    const response = await userService.getAll();
+    
+    // Verifique se a sua API retorna os dados dentro de .data ou direto
+    const userList = Array.isArray(response) ? response : (response.data || []);
+    
+    console.log("Lista de usuários carregada:", userList); // Adicione este log para testar
+    setUsers(userList);
+  } catch (err) {
+    setError('Erro ao carregar');
+  } finally {
+    setLoading(false);
+  }
+};
 
-  /**
-   * Fetches the list of users from the API via userService.
-   * Handles loading state and error messages.
-   */
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
-      setError(''); // Clear previous errors
-      
-      const response = await userService.getAll();
-      
-      // Robust check: API might return an array directly OR an object { data: [...] }
-      // This prevents the app from crashing if the backend structure changes slightly
-      const userList = Array.isArray(response) ? response : (response.data || []);
-      
-      setUsers(userList);
-    } catch (err: any) {
-      console.error("Failed to load users:", err);
-      setError('Não foi possível carregar a lista de usuários.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Populates the form with the selected user's data for editing.
-   */
+  // Correção do erro no String(user.id) e store_id
   const handleEdit = (user: User) => {
     setFormData({
-      id: user.id,
+      id: String(user.id), 
       name: user.name,
       email: user.email,
       role: user.role,
-      // Converts MySQL 1/0 to Javascript true/false
-      is_active: Boolean(user.is_active) 
+      is_active: Boolean(user.is_active),
+      store_id: user.store_id ? String(user.store_id) : '' 
     });
     setIsEditing(true);
   };
 
-  /**
-   * Resets the form to its initial empty state (for creating new users).
-   */
   const resetForm = () => {
-    setFormData({ 
-      id: '', 
-      name: '', 
-      email: '', 
-      role: 'atendente', 
-      is_active: true 
-    });
+    setFormData({ id: '', name: '', email: '', role: 'atendente', is_active: true, store_id: '' });
     setIsEditing(false);
   };
 
-  /**
-   * Handles Form Submission (Create or Update).
-   * Determines logic based on the 'isEditing' flag.
-   */
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevents page reload
+    e.preventDefault();
     
+    // Regra de Negócio: Admin e Cliente não vinculam a loja
+    const isGlobalRole = ['cliente', 'admin', 'proprietario'].includes(formData.role);
+    const finalStoreId = isGlobalRole ? null : (formData.store_id || null);
+
+    // Validação extra: Atendente deve ter loja
+    if (formData.role === 'atendente' && !formData.store_id) {
+      alert("Por favor, selecione uma loja para o atendente.");
+      return;
+    }
+
     try {
-      if (isEditing && typeof formData.id === 'number') {
-        // --- UPDATE FLOW ---
+      if (isEditing && formData.id) { // Agora formData.id é string, checamos se não está vazia
         await userService.update(formData.id, {
           name: formData.name,
           role: formData.role,
-          is_active: formData.is_active
+          is_active: formData.is_active,
+          store_id: finalStoreId
         });
-        alert('Usuário atualizado com sucesso!');
+        alert('Usuário atualizado!');
       } else {
-        // --- CREATE FLOW ---
         await userService.create({
           name: formData.name,
           email: formData.email,
-          role: formData.role
+          role: formData.role,
+          store_id: finalStoreId
         });
-        alert('Usuário criado! Uma senha temporária foi enviada (log).');
+        alert('Usuário criado!');
       }
       
-      // On success: clear form and reload list
       resetForm();
       loadUsers();
-
     } catch (err: any) {
-      console.error("Error saving user:", err);
-      // Extracts error message from Backend or uses generic fallback
       const msg = err.response?.data?.message || 'Erro ao salvar usuário.';
       alert(msg);
     }
   };
 
-  /**
-   * Deletes (or Soft Deletes) a user.
-   */
-  const handleDelete = async (id: number) => {
-    // Native confirmation dialog
-    if (!window.confirm('Tem certeza que deseja desativar este usuário?')) return;
+  const handleDelete = async (user: User) => {
+    const action = user.is_active ? 'desativar' : 'reativar';
+    if (!window.confirm(`Deseja realmente ${action} este usuário?`)) return;
     
     try {
-      await userService.delete(id);
-      loadUsers(); // Refresh list
+      // Usamos String(user.id) para garantir compatibilidade
+      await userService.update(String(user.id), { 
+        is_active: !user.is_active 
+      });
+      loadUsers();
     } catch (err) {
-      console.error("Error deleting user:", err);
-      alert('Erro ao desativar usuário.');
+      alert('Erro ao processar status.');
     }
   };
 
-  // --- Expose Public API ---
-  // Only these properties/functions are accessible to the Component
   return {
-    users,
-    loading,
-    error,
-    formData,
-    setFormData,
-    isEditing,
-    handleEdit,
-    handleDelete,
-    handleSubmit,
-    resetForm
+    users, loading, error, formData, setFormData,
+    isEditing, handleEdit, handleDelete, handleSubmit, resetForm
   };
 }
