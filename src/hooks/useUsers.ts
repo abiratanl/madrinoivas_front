@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
 import { userService } from '../services/userService';
 
-// --- Interfaces Alinhadas ---
+// 1. INTERFACE USER: Reflete o Banco de Dados (MySQL / Soft Delete)
 export interface User {
-  id: string; // Garantindo que seja string
+  id: string; 
   name: string;
   email: string;
   role: 'admin' | 'atendente' | 'proprietario' | 'cliente';
-  is_active: boolean | number;
-  store_id: string | null; // Adicionado para sumir o erro no usr.store_id
+  is_active: boolean | number; // MySQL retorna 1/0
+  store_id: string | null; 
   store_name?: string; 
 }
 
 interface UserFormData {
-  id: string; // Mudado de number | '' para string para bater com formData.id
+  id: string; 
   name: string;
   email: string;
   role: string;
@@ -40,32 +40,28 @@ export function useUsers() {
     loadUsers();
   }, []);
 
-  // No useUsers.ts, dentro de loadUsers
-const loadUsers = async () => {
-  try {
-    setLoading(true);
-    const response = await userService.getAll();
-    
-    // Verifique se a sua API retorna os dados dentro de .data ou direto
-    const userList = Array.isArray(response) ? response : (response.data || []);
-    
-    console.log("Lista de usuários carregada:", userList); // Adicione este log para testar
-    setUsers(userList);
-  } catch (err) {
-    setError('Erro ao carregar');
-  } finally {
-    setLoading(false);
-  }
-};
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await userService.getAll();
+      const userList = Array.isArray(response) ? response : (response.data || []);
+      setUsers(userList);
+    } catch (err) {
+      setError('Não foi possível carregar a lista de usuários.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Correção do erro no String(user.id) e store_id
+  // 2. EDIÇÃO: Carrega os dados no formulário (independente de estar ativo ou não)
   const handleEdit = (user: User) => {
     setFormData({
       id: String(user.id), 
       name: user.name,
       email: user.email,
       role: user.role,
-      is_active: Boolean(user.is_active),
+      // Normaliza para booleano para o checkbox/toggle do front
+      is_active: user.is_active === true || user.is_active === 1,
       store_id: user.store_id ? String(user.store_id) : '' 
     });
     setIsEditing(true);
@@ -76,36 +72,52 @@ const loadUsers = async () => {
     setIsEditing(false);
   };
 
+  const softDeleteUser = async (user: User) => {
+  if (!window.confirm(`AVISO: Operação crítica! Deseja REALMENTE EXCLUIR permanentemente o usuário ${user.name}?`)) return;
+  
+  try {
+    // Chama o método delete do service (Soft Delete no backend)
+    await userService.delete(user.id); 
+    alert('Usuário excluído com sucesso!');
+    loadUsers(); // Recarrega a lista para ele sumir do grid
+  } catch (err) {
+    alert('Erro ao excluir usuário.');
+  }
+};
+
+  // 3. SUBMISSÃO: Validações e Regras de Loja
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Regra de Negócio: Admin e Cliente não vinculam a loja
+    // Regra: Perfis globais não vinculam loja no banco
     const isGlobalRole = ['cliente', 'admin', 'proprietario'].includes(formData.role);
     const finalStoreId = isGlobalRole ? null : (formData.store_id || null);
 
-    // Validação extra: Atendente deve ter loja
+    // Trava de segurança: Atendente deve ter loja obrigatoriamente
     if (formData.role === 'atendente' && !formData.store_id) {
       alert("Por favor, selecione uma loja para o atendente.");
       return;
     }
 
     try {
-      if (isEditing && formData.id) { // Agora formData.id é string, checamos se não está vazia
+      if (isEditing && formData.id) {
+        // UPDATE: Enviamos apenas o necessário (sem e-mail para evitar erro de duplicidade)
         await userService.update(formData.id, {
           name: formData.name,
           role: formData.role,
           is_active: formData.is_active,
           store_id: finalStoreId
         });
-        alert('Usuário atualizado!');
+        alert('Usuário atualizado com sucesso!');
       } else {
+        // CREATE: Envio completo
         await userService.create({
           name: formData.name,
           email: formData.email,
           role: formData.role,
           store_id: finalStoreId
         });
-        alert('Usuário criado!');
+        alert('Usuário criado com sucesso!');
       }
       
       resetForm();
@@ -116,23 +128,25 @@ const loadUsers = async () => {
     }
   };
 
+  // 4. MUDANÇA DE STATUS: Alterna entre Ativo/Inativo (Soft Delete no Back)
   const handleDelete = async (user: User) => {
-    const action = user.is_active ? 'desativar' : 'reativar';
+    const isCurrentlyActive = user.is_active === true || user.is_active === 1;
+    const action = isCurrentlyActive ? 'desativar' : 'reativar';
+    
     if (!window.confirm(`Deseja realmente ${action} este usuário?`)) return;
     
     try {
-      // Usamos String(user.id) para garantir compatibilidade
       await userService.update(String(user.id), { 
-        is_active: !user.is_active 
+        is_active: !isCurrentlyActive 
       });
       loadUsers();
     } catch (err) {
-      alert('Erro ao processar status.');
+      alert('Erro ao processar alteração de status.');
     }
   };
 
   return {
     users, loading, error, formData, setFormData,
-    isEditing, handleEdit, handleDelete, handleSubmit, resetForm
+    isEditing, handleEdit, handleDelete, handleSubmit, softDeleteUser, resetForm
   };
 }

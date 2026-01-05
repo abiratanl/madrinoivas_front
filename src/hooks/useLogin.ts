@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { useAuth } from '../contexts/AuthContext'; // Importamos o contexto
+import { useAuth } from '../contexts/AuthContext'; 
 
 export function useLogin() {
     const navigate = useNavigate();
-    const { signIn } = useAuth(); // Pegamos a função que atualiza o estado global
+    const { signIn } = useAuth(); 
     
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
