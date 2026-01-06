@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   Menu, X, LayoutDashboard, Calendar, Image, 
-  Package, Tag, Users as UsersIcon, UserCircle, LogOut 
+  Package, Tag, Contact2, Users as UsersIcon, UserCircle, LogOut 
 } from 'lucide-react';
 
 export function Sidebar() {
@@ -32,6 +32,12 @@ export function Sidebar() {
       path: '/rentals', 
       roles: ['proprietario', 'atendente', 'admin'],
       icon: <Calendar className="w-5 h-5" />
+    },
+    { 
+      label: 'Clientes', 
+      path: '/customers', 
+      roles: ['proprietario', 'atendente', 'admin'],
+      icon: <Contact2 className="w-5 h-5" />
     },
     { 
       label: 'Showroom', 

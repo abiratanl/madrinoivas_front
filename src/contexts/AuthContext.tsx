@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { api } from '../services/api';
+import { toast } from 'react-hot-toast';
 
 interface User {
   id: number;
@@ -14,7 +15,6 @@ interface AuthContextType {
   signed: boolean;
   user: User | null;
   loading: boolean;
-  // CORREÇÃO: A ordem agora é (token, user) para bater com o useLogin
   signIn: (token: string, user: User) => void;
   signOut: () => void;
 }
@@ -27,18 +27,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loadStorageData = async () => {
-      // Usando chaves específicas para evitar conflito com outros apps em localhost
       const storagedToken = localStorage.getItem('@MadriNoivas:token');
       const storagedUser = localStorage.getItem('@MadriNoivas:user');
 
-      if (storagedToken && storagedUser) {
+      // Verifica se ambos existem e se o token não é apenas uma string em branco
+      if (storagedToken && storagedUser && storagedToken.length > 10) {
         try {
           const parsedUser = JSON.parse(storagedUser);
           api.defaults.headers.common['Authorization'] = `Bearer ${storagedToken}`;
           setUser(parsedUser);
         } catch (error) {
           console.error("Erro ao ler dados do storage", error);
-          signOut();
+          signOut(); // Limpa tudo se os dados estiverem corrompidos
         }
       }
       setLoading(false);
@@ -55,8 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('@MadriNoivas:token', token);
     localStorage.setItem('@MadriNoivas:user', JSON.stringify(userData));
     
-    // 3. Atualiza Estado
+    // 3. Atualiza Estado e Notifica
     setUser(userData);
+    toast.success(`Bem-vinda, ${userData.name.split(' ')[0]}!`, {
+      style: { borderRadius: '10px', background: '#333', color: '#fff' }
+    });
     console.log("🔐 Contexto: Login realizado com sucesso para role:", userData.role);
   };
 
@@ -64,10 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('@MadriNoivas:user');
     localStorage.removeItem('@MadriNoivas:token');
     
-    // Importante: limpar o header para evitar erros em requisições futuras
+    // Limpa o header para evitar que o token antigo seja usado
     delete api.defaults.headers.common['Authorization'];
     
     setUser(null);
+    toast('Até logo! Sessão encerrada.', { icon: '👋' });
+    console.log("🔐 Contexto: Logout realizado com sucesso.");
   };
 
   return (
@@ -78,5 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
 }

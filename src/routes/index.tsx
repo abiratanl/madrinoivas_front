@@ -24,15 +24,18 @@ const Users = lazy(() => import('../pages/Users/index'));
 const ClientPage = lazy(() => import('../pages/Clients/index')); 
 const Rentals = lazy(() => import('../pages/Rentals/index'));
 
-// === CATEGORIAS ===
+// === CATEGORIES ===
 const Categories = lazy(() => import('../pages/Categories/index'));
 const CategoryForm = lazy(() => import('../pages/CategoryForm/index'));
 
-// === PRODUTOS ===
+// === PRODUCTS ===
 const Products = lazy(() => import('../pages/Products/index'));
 const ProductForm = lazy(() => import('../pages/ProductForm/index'));
 
-// === SHOWROOM (NOVA IMPORTAÇÃO CORRETA) ===
+// === CLIENTS ===
+const Customers = lazy(() => import('../pages/Customers/index'));
+
+// === SHOWROOM  ===
 const Showroom = lazy(() => import('../pages/Showroom/index')); 
 
 // Simple Loading Component
@@ -106,7 +109,7 @@ export const router = createBrowserRouter([
 
           // --- ADMINISTRATIVE AREA (Admin Only) ---
           {
-            element: <PrivateRoute allowedRoles={['admin']} />,
+            element: <PrivateRoute allowedRoles={['admin', 'proprietario']} />,
             children: [
               {
                 path: "/users", 
@@ -116,7 +119,7 @@ export const router = createBrowserRouter([
           },
 
           // --- OPERATIONAL AREA (Admin, Owner, Attendant) ---
-          // Aqui é o lugar perfeito para o Showroom
+          
           {
             element: <PrivateRoute allowedRoles={['admin', 'proprietario', 'atendente']} />,
             children: [
@@ -124,8 +127,19 @@ export const router = createBrowserRouter([
                 path: "/rentals", 
                 element: (<Suspense fallback={<Loading />}><Rentals /></Suspense>)
               },
+
+              // === CLIENTES ===
+              {
+                path: "/customers",
+                element: (
+                  <Suspense fallback={<Loading />}>
+                    <Customers />
+                  </Suspense>
+                )
+              },
+              // ========================================
               
-              // === SHOWROOM (NOVA ROTA) ===
+              // === SHOWROOM ===
               {
                 path: "/showroom",
                 element: (
@@ -135,7 +149,7 @@ export const router = createBrowserRouter([
                 )
               },
 
-              // === ROTAS DE CATEGORIAS ===
+              // === CATEGORIES ROUTES ===
               {
                 path: "/categories",
                 element: (<Suspense fallback={<Loading />}><Categories /></Suspense>)
@@ -148,7 +162,7 @@ export const router = createBrowserRouter([
                 path: "/categories/edit/:id",
                 element: (<Suspense fallback={<Loading />}><CategoryForm /></Suspense>)
               },
-              // === ROTAS DE PRODUTOS ===
+              // === PRODUCTS ROUTES ===
               {
                 path: "/products",
                 element: (<Suspense fallback={<Loading />}><Products /></Suspense>)
