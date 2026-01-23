@@ -59,7 +59,7 @@ function Home() {
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
       
       {/* === HERO / CABEÇALHO === */}
-      <header className="bg-rose-600 py-20 text-white shadow-lg relative overflow-hidden">
+      <header className="bg-amber-400 py-20 text-white shadow-lg relative overflow-hidden">
         <div className="container mx-auto px-4 text-center relative z-10">
           <h1 className="mb-4 text-5xl font-bold tracking-tight font-serif">Madri Noivas</h1>
           <p className="text-xl opacity-90 font-light mb-8">Você vive o momento, nós vestimos a memória.</p>
@@ -69,7 +69,7 @@ function Home() {
               to="/auth/login" 
               className="inline-block rounded-full bg-white px-8 py-3 text-sm font-bold text-rose-600 shadow-lg transition-transform hover:scale-105 hover:bg-gray-100 uppercase tracking-wider"
             >
-              Acessar Área do Cliente
+              Acessar Área Restrita
             </Link>
           </div>
         </div>

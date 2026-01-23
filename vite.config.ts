@@ -15,7 +15,6 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    // 2. Configuração PWA adicionada aqui (sem apagar o resto):
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],

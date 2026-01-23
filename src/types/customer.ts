@@ -5,6 +5,7 @@ export interface Contact {
   type: 'whatsapp' | 'mobile' | 'email' | 'phone';
   value: string;
   is_primary: boolean | number;
+  is_active: boolean;
 }
 
 // 2. Interface de Endereços (Baseado na sua tabela 'addresses')

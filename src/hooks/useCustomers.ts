@@ -21,7 +21,7 @@ export function useCustomers() {
       quadril: '',
       altura: '',
     },
-    contacts: [{ type: 'whatsapp', value: '', is_primary: 1 }],
+    contacts: [{ type: 'whatsapp', value: '', is_primary: 1, is_active: true }],
     addresses: [{ 
       type: 'residential', label: 'Principal', zip_code: '', 
       street: '', number: '', neighborhood: '', city: '', state: '', is_default: 1 
@@ -34,23 +34,23 @@ export function useCustomers() {
     loadCustomers();
   }, []);
 
-  const loadCustomers = async (search?: string) => {
-    try {
-      setLoading(true);
-      const data = await customerService.getAll(search);
-      setCustomers(data);
-    } catch (err: any) {
-      console.error('Erro ao carregar clientes', err);
-      toast.error('Não foi possível carregar a lista de clientes.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadCustomers = async (search?: string, includeInactives: boolean = false) => {
+  setLoading(true);
+  try {
+    // Passamos o objeto de filtros para o service
+    const data = await customerService.getAll(search, includeInactives);
+    setCustomers(data);
+  } catch (error) {
+    toast.error("Erro ao carregar dados.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // --- Funções Auxiliares para Listas Dinâmicas ---
 
   const addContact = () => {
-    const newContact: Contact = { type: 'whatsapp', value: '', is_primary: 0 };
+    const newContact: Contact = { type: 'whatsapp', value: '', is_primary: 0, is_active: true };
     setFormData(prev => ({
       ...prev,
       contacts: [...(prev.contacts || []), newContact]
@@ -96,6 +96,40 @@ export function useCustomers() {
     }
   };
 
+  const toggleCustomerStatus = async (id: string, currentStatus: boolean) => {
+  try {
+    const newStatus = !currentStatus;
+    // O hook gerencia a chamada ao service
+    const success = await customerService.update(id, { is_active: newStatus });
+    
+    if (success) {
+      // O hook gerencia a atualização da lista local
+      await loadCustomers(); 
+      toast.success(newStatus ? 'Cliente ativado!' : 'Cliente inativado!');
+      return true;
+    }
+  } catch (error) {
+    console.error(error);
+    toast.error('Erro ao alterar status.');
+  }
+  return false;
+};
+
+  const deleteCustomer = async (id: string) => {
+  try {
+    const response = await customerService.softDelete(id); 
+    if (response) {
+      setCustomers(prev => prev.filter(c => c.id !== id));
+      toast.success('Cliente removido com sucesso!');
+      return true;
+    }
+  } catch (err) {
+    toast.error('Erro ao excluir cliente.');
+    return false;
+  }
+  return false;
+};
+
   const handleSubmit = async (e: React.FormEvent, step?: number): Promise<boolean> => { // <-- Adicione : Promise<boolean>
   if (e) e.preventDefault();
 
@@ -131,6 +165,9 @@ export function useCustomers() {
   return {
     customers, loading, formData, setFormData, isEditing,
     handleEdit, handleSubmit, resetForm, loadCustomers,
-    addContact, removeContact, addAddress, removeAddress
+    addContact, removeContact, addAddress, removeAddress,
+    deleteCustomer, toggleCustomerStatus
   };
+
+  
 }
