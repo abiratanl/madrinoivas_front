@@ -1,10 +1,29 @@
 import { RouterProvider } from 'react-router-dom';
-import { router } from './routes'; // Importa o roteador que você postou acima
+import { router } from './routes';
+import { ToastContainer } from 'react-toastify'; // Importe a biblioteca
+import 'react-toastify/dist/ReactToastify.css'; // Importe o CSS da biblioteca
 
 function App() {
   return (
-    // O RouterProvider é quem injeta toda a lógica do seu arquivo de rotas
-    <RouterProvider router={router} />
+    <>
+      {/* 
+         O RouterProvider cuida das páginas. 
+         O ToastContainer cuida das notificações que aparecerão sobre qualquer página.
+      */}
+      <RouterProvider router={router} />
+      
+      <ToastContainer 
+        position="top-right" 
+        autoClose={3000} 
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </>
   );
 }
 

@@ -22,6 +22,19 @@ export const authService = {
   },
 
   /**
+   * Change the user's password while authenticated.
+   * PUT /users/change-password
+   */
+  changePassword: async (currentPassword: string, newPassword: string) => {
+  // O caminho deve incluir o prefixo /api que você usa no seu app.js
+  const response = await api.post('/auth/change-password', { 
+    currentPassword, 
+    newPassword 
+  });
+  return response.data;
+},
+
+  /**
    * Reset your password using the token received by email..
    * POST /auth/reset-password/:token
    */

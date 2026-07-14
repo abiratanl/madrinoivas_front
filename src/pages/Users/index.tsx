@@ -80,6 +80,8 @@ function Users() {
     return matchesSearch && matchesStatus;
   });
 
+
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* HEADER */}
@@ -157,104 +159,53 @@ function Users() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  className={cn(
-                    "hover:bg-gray-50 transition-colors",
-                    !(user.is_active === true || user.is_active === 1) &&
-                      "opacity-60 bg-gray-50/50",
-                  )}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold uppercase">
-                        {user.name.charAt(0)}
+              {filteredUsers.map((user) => {
+                return (
+                  <tr
+                    key={user.id}
+                    className={cn(
+                      "hover:bg-gray-50 transition-colors",
+                      !(user.is_active === true || user.is_active === 1) && "opacity-60 bg-gray-50/50"
+                    )}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold uppercase">
+                          {user.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm">
+                            {user.name}
+                          </p>
+                          <p className="text-xs text-gray-500">{user.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-gray-900 text-sm">
-                          {user.name}
-                        </p>
-                        <p className="text-xs text-gray-500">{user.email}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm">
+                        <div className="flex items-center gap-1.5 font-medium capitalize text-gray-700">
+                          {user.role === "admin" && <Shield className="w-3.5 h-3.5 text-rose-500" />}
+                          {user.role === "proprietario" && <Crown className="w-3.5 h-3.5 text-amber-500" />}
+                          {user.role === "atendente" && <User className="w-3.5 h-3.5 text-blue-500" />}
+                          {user.role === "cliente" && <User className="w-3.5 h-3.5 text-gray-400" />}
+                          {user.role}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
+                          <Store className="w-3 h-3" />
+                          {
+                            ['admin', 'proprietario', 'cliente'].includes(user.role.toLowerCase())
+                              ? "Geral"
+                              : (
+                                // Busca o nome na lista de lojas usando o ID do usuário
+                                stores.find(s => s.id === user.store_id)?.name || "Loja não definida"
+                              )
+                          }
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm">
-                      <div className="flex items-center gap-1.5 font-medium capitalize text-gray-700">
-                        {user.role === "admin" && (
-                          <Shield className="w-3.5 h-3.5 text-rose-500" />
-                        )}
-                        {user.role === "proprietario" && (
-                          <Crown className="w-3.5 h-3.5 text-amber-500" />
-                        )}
-                        {user.role === "atendente" && (
-                          <User className="w-3.5 h-3.5 text-blue-500" />
-                        )}
-                        {user.role === "cliente" && (
-                          <User className="w-3.5 h-3.5 text-gray-400" />
-                        )}
-                        {user.role}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
-                        <Store className="w-3 h-3" />
-                        {user.store_name || "Geral"}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={cn(
-                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                        user.is_active === true || user.is_active === 1
-                          ? "bg-green-100 text-green-700"
-                          : "bg-amber-100 text-amber-700",
-                      )}
-                    >
-                      {user.is_active === true || user.is_active === 1
-                        ? "Ativo"
-                        : "Inativo"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-1">
-                      {/* EDITAR */}
-                      <button
-                        onClick={() => openEditModal(user)}
-                        title="Editar"
-                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-
-                      {/* STATUS (IS_ACTIVE) */}
-                      <button
-                        onClick={() => handleDelete(user)}
-                        title={
-                          user.is_active ? "Inativar Acesso" : "Reativar Acesso"
-                        }
-                        className={cn(
-                          "p-2 transition-colors",
-                          user.is_active === true || user.is_active === 1
-                            ? "text-gray-300 hover:text-amber-500"
-                            : "text-gray-300 hover:text-green-600",
-                        )}
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
-
-                      {/* SOFT DELETE (DELETED_AT) */}
-                      <button
-                        onClick={() => softDeleteUser && softDeleteUser(user)}
-                        title="Excluir Usuário"
-                        className="p-2 text-gray-300 hover:text-rose-600 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

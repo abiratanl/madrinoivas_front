@@ -26,6 +26,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   response => response,
   error => {
+    if (error.config.url.includes('/change-password')) {
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401) {
       console.warn("Sessão expirada. Limpando dados locais.");
       localStorage.removeItem('token');

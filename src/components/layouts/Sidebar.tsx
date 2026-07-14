@@ -1,19 +1,21 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import UserProfileModal from '@/components/common/UserProfileModal';
 import { useAuth } from '../../contexts/AuthContext';
-import { 
-  Menu, X, LayoutDashboard, Calendar, Image, 
-  Package, Tag, Contact2, Users as UsersIcon, UserCircle, LogOut 
+import {
+  Menu, X, LayoutDashboard, Calendar, Image,
+  Package, Tag, Contact2, Users as UsersIcon, UserCircle, LogOut
 } from 'lucide-react';
 
 export function Sidebar() {
   const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false); // Controle do menu mobile
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    signOut(); 
+    signOut();
     navigate('/auth/login');
   };
 
@@ -21,51 +23,51 @@ export function Sidebar() {
 
   // Definição dos itens de menu baseados no perfil
   const menuItems = [
-    { 
-      label: 'Dashboard', 
-      path: '/dashboard', 
+    {
+      label: 'Dashboard',
+      path: '/dashboard',
       roles: ['proprietario', 'admin'],
       icon: <LayoutDashboard className="w-5 h-5" />
     },
-    { 
-      label: 'Aluguéis', 
-      path: '/rentals', 
+    {
+      label: 'Aluguéis',
+      path: '/rentals',
       roles: ['proprietario', 'atendente', 'admin'],
       icon: <Calendar className="w-5 h-5" />
     },
-    { 
-      label: 'Clientes', 
-      path: '/customers', 
+    {
+      label: 'Clientes',
+      path: '/customers',
       roles: ['proprietario', 'atendente', 'admin'],
       icon: <Contact2 className="w-5 h-5" />
     },
-    { 
-      label: 'Showroom', 
-      path: '/showroom', 
+    {
+      label: 'Showroom',
+      path: '/showroom',
       roles: ['proprietario', 'atendente', 'admin'],
       icon: <Image className="w-5 h-5" />
     },
-    { 
-      label: 'Produtos', 
-      path: '/products', 
+    {
+      label: 'Produtos',
+      path: '/products',
       roles: ['proprietario', 'atendente', 'admin'],
       icon: <Package className="w-5 h-5" />
     },
-    { 
-      label: 'Categorias', 
-      path: '/categories', 
+    {
+      label: 'Categorias',
+      path: '/categories',
       roles: ['proprietario', 'atendente', 'admin'],
       icon: <Tag className="w-5 h-5" />
     },
-    { 
-      label: 'Usuários', 
-      path: '/users', 
+    {
+      label: 'Usuários',
+      path: '/users',
       roles: ['admin', 'proprietario'],
       icon: <UsersIcon className="w-5 h-5" />
     },
-    { 
-      label: 'Área do Cliente', 
-      path: '/client-area', 
+    {
+      label: 'Área do Cliente',
+      path: '/client-area',
       roles: ['cliente'],
       icon: <UserCircle className="w-5 h-5" />
     },
@@ -74,7 +76,7 @@ export function Sidebar() {
   return (
     <>
       {/* BOTÃO MOBILE (Aparece apenas em telas pequenas) */}
-      <button 
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className="lg:hidden fixed top-4 right-4 z-[60] p-2 bg-rose-600 text-white rounded-lg shadow-lg active:scale-95 transition-transform"
       >
@@ -83,7 +85,7 @@ export function Sidebar() {
 
       {/* OVERLAY ESCURO (Fecha o menu ao clicar fora) */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
@@ -116,8 +118,8 @@ export function Sidebar() {
                       to={item.path}
                       onClick={() => setIsOpen(false)}
                       className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
-                        ${isActive 
-                          ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/20' 
+                        ${isActive
+                          ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/20'
                           : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                         }`}
                     >
@@ -126,39 +128,55 @@ export function Sidebar() {
                     </Link>
                   </li>
                 );
-            })}
+              })}
           </ul>
         </nav>
 
         {/* Rodapé do Usuário */}
         <div className="border-t border-gray-800 p-4 bg-gray-950/50">
-          <div className="flex items-center gap-3">
+          {/* Adicionamos o cursor-pointer para indicar que é clicável */}
+          <div
+            className="flex items-center gap-3 cursor-pointer hover:bg-gray-800/50 p-2 rounded-lg transition-colors"
+            onClick={() => setIsProfileModalOpen(true)}
+          >
             <div className="h-10 w-10 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white font-bold shadow-lg shrink-0">
               {user?.name?.charAt(0).toUpperCase() || 'U'}
             </div>
-            
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">
-                {user?.name || 'Usuário'}
-              </p>
-              
-              <div className="flex items-center justify-between mt-0.5">
-                <p className="text-xs text-gray-500 capitalize truncate">
-                  {user?.role || 'Visitante'}
-                </p>
 
-                <button 
-                  onClick={handleLogout}
-                  className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter text-rose-400 hover:text-rose-300 transition-colors"
-                >
-                  Sair
-                  <LogOut className="w-3 h-3" />
-                </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white truncate">{user?.name || 'Usuário'}</p>
+              <div className="flex items-center justify-between mt-0.5">
+                <p className="text-xs text-gray-500 capitalize truncate">{user?.role || 'Visitante'}</p>
               </div>
             </div>
           </div>
+
+          <div className="flex items-center justify-between mt-2">
+            {/* Trocar Senha alinhado à esquerda */}
+            <button
+              onClick={() => setIsProfileModalOpen(true)}
+              className="text-[10px] font-bold uppercase tracking-tighter text-gray-400 hover:text-white transition-colors"
+            >
+              Trocar Senha
+            </button>
+
+            {/* Sair alinhado à direita */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter text-rose-400 hover:text-rose-300 transition-colors"
+            >
+              Sair
+              <LogOut className="w-3 h-3" />
+            </button>
+          </div>
         </div>
       </aside>
+
+      {/* Renderização do Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
     </>
   );
 }
