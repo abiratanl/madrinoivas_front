@@ -73,5 +73,11 @@ export const rentalService = {
   cancelRental: async (id: number | string) => {
     const response = await api.post(`/rentals/${id}/cancel`);
     return response.data;
+  },
+
+  // PUT /:id - Atualizar Aluguel
+  update: async (id: number | string, data: CreateRentalDTO) => {
+    const response = await api.put(`/rentals/${id}`, data);
+    return response.data;
   }
 };

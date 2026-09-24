@@ -248,7 +248,7 @@ export function useRentals() {
     try {
       let createdRental: any = null;
       if (isEditing && editingRentalId) {
-        await rentalService.create(payload);
+        await rentalService.update(editingRentalId, payload);
         toast.success('Aluguel atualizado!', { id: loadingToast });
         createdRental = { id: editingRentalId };
       } else {
