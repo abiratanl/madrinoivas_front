@@ -397,7 +397,7 @@ export function RentalModal({
 
         {/* FOOTER */}
         <div className="p-6 border-t bg-gray-50 flex justify-between">
-          {currentStep > 1 && (
+          {(currentStep > 1 && !isEditing) || (currentStep === 3 && isEditing) && (
             <button
               type="button"
               onClick={handlePrevStep}
