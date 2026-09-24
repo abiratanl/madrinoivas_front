@@ -30,6 +30,7 @@ interface RentalModalProps {
   handlePrevStep: () => void;
   validateStep1: () => boolean;
   validateStep2: () => boolean;
+  validateStep3: () => boolean;
   getProductName: (id: string) => string;
 }
 
@@ -37,7 +38,7 @@ export function RentalModal({
   isOpen, onClose, isEditing, currentStep, setCurrentStep,
   formData, setFormData, customers, availableProducts,
   handleSubmit, addProduct, removeProduct, updateProductQuantity,
-  handleNextStep, handlePrevStep, validateStep1, validateStep2,
+  handleNextStep, handlePrevStep, validateStep1, validateStep2, validateStep3,
   getProductName,
 }: RentalModalProps) {
   const [customerSearch, setCustomerSearch] = useState('');
@@ -117,7 +118,7 @@ export function RentalModal({
         </div>
 
         {/* FORMULÁRIO COM SCROLL */}
-        <form id="rental-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form id="rental-form" className="flex-1 overflow-y-auto p-6 space-y-6" onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}>
           
           {/* PASSO 1: SELEÇÃO DO CLIENTE */}
           {currentStep === 1 && (
@@ -422,9 +423,15 @@ export function RentalModal({
               </button>
             ) : (
               <button
-                type="submit"
-                form="rental-form"
-                className="px-8 py-2.5 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 active:scale-95 transition-all"
+                type="button"
+                disabled={!validateStep1() || !validateStep2() || !validateStep3()}
+                onClick={handleSubmit}
+                className={cn(
+                  "px-8 py-2.5 rounded-xl font-bold shadow-lg transition-all",
+                  (validateStep1() && validateStep2() && validateStep3())
+                    ? "bg-green-600 text-white hover:bg-green-700 active:scale-95"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                )}
               >
                 {isEditing ? 'Salvar Alterações' : 'Finalizar Aluguel'}
               </button>

@@ -213,6 +213,7 @@ export default function Rentals() {
     loadRentals,
     validateStep1,
     validateStep2,
+    validateStep3,
     loadRentalDetails,
     rentalDetailsCache,
   } = useRentals();
@@ -611,6 +612,7 @@ export default function Rentals() {
         handlePrevStep={handlePrevStep}
         validateStep1={validateStep1}
         validateStep2={validateStep2}
+        validateStep3={validateStep3}
         getProductName={getProductName}
       />
     </div>

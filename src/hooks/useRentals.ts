@@ -130,9 +130,6 @@ export function useRentals() {
       const response = await rentalService.getById(id);
       // API retorna { status: 'success', data: { ...rental } }
       const rental = response.data?.data || response.data || response;
-      console.log('🔍 Rental data for edit:', rental);
-      console.log('🔍 Rental items:', rental.items);
-      console.log('🔍 First item structure:', rental.items?.[0]);
       
       setFormData({
         customer_id: rental.customer_id || '',
@@ -147,7 +144,7 @@ export function useRentals() {
       });
       setIsEditing(true);
       setEditingRentalId(id);
-      setCurrentStep(1); // Start at step 1 to allow full editing
+      setCurrentStep(1); // Start at step 1 for full editing
       setIsModalOpen(true);
     } catch (error) {
       toast.error('Erro ao carregar aluguel');
@@ -193,10 +190,9 @@ export function useRentals() {
 
   const validateStep1 = () => formData.customer_id !== '';
   const validateStep2 = () => formData.products.length > 0;
-  const validateStep3 = () => formData.start_date && formData.end_date_scheduled;
+  const validateStep3 = () => !!formData.start_date && !!formData.end_date_scheduled;
 
   const handleNextStep = () => {
-    console.log('🔍 handleNextStep called, currentStep:', currentStep, 'isEditing:', isEditing);
     if (currentStep === 1 && !validateStep1()) {
       toast.error('Selecione um cliente');
       return;
@@ -213,7 +209,6 @@ export function useRentals() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log('🔍 handleSubmit called, currentStep:', currentStep, 'isEditing:', isEditing);
     e.preventDefault();
     
     if (!validateStep1() || !validateStep2() || !validateStep3()) {
@@ -225,10 +220,6 @@ export function useRentals() {
 
     // Determine store_id: use selectedStore for admin/owner, or user's store_id for attendants
     const storeId = selectedStore?.id || user?.store_id;
-    
-    console.log('🏪 selectedStore:', selectedStore);
-    console.log('👤 user.store_id:', user?.store_id);
-    console.log('🏪 storeId to use:', storeId);
     
     if (!storeId) {
       toast.error('Nenhuma loja selecionada. Selecione uma loja para continuar.', { id: loadingToast });
@@ -245,8 +236,6 @@ export function useRentals() {
       discount: parseFloat(String(formData.discount || 0)),
     };
 
-    console.log('📤 Sending rental payload:', JSON.stringify(payload, null, 2));
-
     try {
       let createdRental: any = null;
       if (isEditing && editingRentalId) {
@@ -260,15 +249,13 @@ export function useRentals() {
       }
 
       closeModal();
+      // Clear cache to force fresh data
+      setRentalDetailsCache({});
       loadRentals({ status: statusFilter || undefined });
       
       // Return created rental for highlighting
       return createdRental;
     } catch (err: any) {
-      console.error('❌ Rental creation error:', err);
-      console.error('❌ Error response:', JSON.stringify(err.response?.data, null, 2));
-      console.error('❌ Error status:', err.response?.status);
-      console.error('❌ Request payload:', JSON.stringify(payload, null, 2));
       const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Erro ao salvar aluguel';
       toast.error(msg, { id: loadingToast });
     }

@@ -51,7 +51,6 @@ export const rentalService = {
   // GET /:id - Detalhes do aluguel
   getById: async (id: number | string) => {
     const response = await api.get(`/rentals/${id}`);
-    console.log('🔍 Rental getById response:', response.data);
     return response.data.data || response.data;
   },
 
