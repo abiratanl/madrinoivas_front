@@ -144,7 +144,7 @@ export function useRentals() {
       });
       setIsEditing(true);
       setEditingRentalId(id);
-      setCurrentStep(1); // Start at step 1 for full editing
+      setCurrentStep(2); // Start at step 2 (products) since client can't be changed
       setIsModalOpen(true);
     } catch (error) {
       toast.error('Erro ao carregar aluguel');
