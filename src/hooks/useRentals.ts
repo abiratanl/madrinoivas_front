@@ -147,7 +147,7 @@ export function useRentals() {
       });
       setIsEditing(true);
       setEditingRentalId(id);
-      setCurrentStep(2); // Start at products step when editing
+      setCurrentStep(1); // Start at step 1 to allow full editing
       setIsModalOpen(true);
     } catch (error) {
       toast.error('Erro ao carregar aluguel');
@@ -196,6 +196,7 @@ export function useRentals() {
   const validateStep3 = () => formData.start_date && formData.end_date_scheduled;
 
   const handleNextStep = () => {
+    console.log('🔍 handleNextStep called, currentStep:', currentStep, 'isEditing:', isEditing);
     if (currentStep === 1 && !validateStep1()) {
       toast.error('Selecione um cliente');
       return;
@@ -212,6 +213,7 @@ export function useRentals() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log('🔍 handleSubmit called, currentStep:', currentStep, 'isEditing:', isEditing);
     e.preventDefault();
     
     if (!validateStep1() || !validateStep2() || !validateStep3()) {
@@ -240,7 +242,7 @@ export function useRentals() {
       products: formData.products,
       status: formData.status,
       store_id: String(storeId),
-      discount: formData.discount || 0,
+      discount: parseFloat(String(formData.discount || 0)),
     };
 
     console.log('📤 Sending rental payload:', JSON.stringify(payload, null, 2));
