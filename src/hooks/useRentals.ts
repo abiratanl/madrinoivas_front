@@ -43,17 +43,35 @@ export function useRentals() {
   const rentalDetailsCacheRef = useRef(rentalDetailsCache);
   rentalDetailsCacheRef.current = rentalDetailsCache;
 
+  // Estados para carregar cancelados e devolvidos sob demanda
+  const [loadingCancelled, setLoadingCancelled] = useState(false);
+  const [loadingReturned, setLoadingReturned] = useState(false);
+  const [hasLoadedCancelled, setHasLoadedCancelled] = useState(false);
+  const [hasLoadedReturned, setHasLoadedReturned] = useState(false);
+
   const loadRentals = useCallback(async (filters?: { status?: string }) => {
     setLoading(true);
     try {
       const data = await rentalService.getAll(filters);
       // Carrega apenas o resumo - detalhes serão carregados sob demanda
-      const normalized = Array.isArray(data) ? data.map((r: any) => ({
-        ...r,
-        total_price: parseFloat(r.total_amount || '0'),
-        items: r.items || [],
-        customer_name: r.customer_name || '', // API returns customer_name, not customer_id
-      })) : [];
+      let normalized = Array.isArray(data) ? data.map((r: any) => {
+        // Buscar CPF do cliente no array de clientes carregados (se disponível)
+        const customer = customers.find(c => String(c.id) === String(r.customer_id));
+        return {
+          ...r,
+          total_price: parseFloat(r.total_amount || '0'),
+          items: r.items || [],
+          customer_name: r.customer_name || '',
+          customer_cpf: customer?.cpf || r.customer?.cpf || r.customer_cpf || '',
+        };
+      }) : [];
+      
+      // Se não há filtro de status específico (carregamento inicial ou "Todos"), 
+      // filtrar cancelados e devolvidos para melhor performance
+      if (!filters?.status) {
+        normalized = normalized.filter(r => r.status !== 'cancelled' && r.status !== 'returned');
+      }
+      
       setRentals(normalized);
     } catch (error) {
       toast.error('Erro ao carregar aluguéis');
@@ -62,6 +80,58 @@ export function useRentals() {
       setLoading(false);
     }
   }, []);
+
+  // Carregar cancelados sob demanda
+  const loadCancelledRentals = useCallback(async () => {
+    if (hasLoadedCancelled || loadingCancelled) return;
+    setLoadingCancelled(true);
+    try {
+      const data = await rentalService.getAll({ status: 'cancelled' });
+      const normalized = Array.isArray(data) ? data.map((r: any) => {
+        const customer = customers.find(c => String(c.id) === String(r.customer_id));
+        return {
+          ...r,
+          total_price: parseFloat(r.total_amount || '0'),
+          items: r.items || [],
+          customer_name: r.customer_name || '',
+          customer_cpf: customer?.cpf || r.customer?.cpf || r.customer_cpf || '',
+        };
+      }) : [];
+      setRentals(prev => [...prev, ...normalized]);
+      setHasLoadedCancelled(true);
+    } catch (error) {
+      toast.error('Erro ao carregar aluguéis cancelados');
+      console.error(error);
+    } finally {
+      setLoadingCancelled(false);
+    }
+  }, [customers, hasLoadedCancelled, loadingCancelled]);
+
+  // Carregar devolvidos sob demanda
+  const loadReturnedRentals = useCallback(async () => {
+    if (hasLoadedReturned || loadingReturned) return;
+    setLoadingReturned(true);
+    try {
+      const data = await rentalService.getAll({ status: 'returned' });
+      const normalized = Array.isArray(data) ? data.map((r: any) => {
+        const customer = customers.find(c => String(c.id) === String(r.customer_id));
+        return {
+          ...r,
+          total_price: parseFloat(r.total_amount || '0'),
+          items: r.items || [],
+          customer_name: r.customer_name || '',
+          customer_cpf: customer?.cpf || r.customer?.cpf || r.customer_cpf || '',
+        };
+      }) : [];
+      setRentals(prev => [...prev, ...normalized]);
+      setHasLoadedReturned(true);
+    } catch (error) {
+      toast.error('Erro ao carregar aluguéis devolvidos');
+      console.error(error);
+    } finally {
+      setLoadingReturned(false);
+    }
+  }, [customers, hasLoadedReturned, loadingReturned]);
 
   // Carregar detalhes completos de um aluguel sob demanda
   const loadRentalDetails = useCallback(async (id: string) => {
@@ -101,10 +171,29 @@ export function useRentals() {
   }, []);
 
   useEffect(() => {
-    loadRentals();
-    loadCustomers();
-    loadAvailableProducts();
-  }, [loadRentals, loadCustomers, loadAvailableProducts]);
+    let mounted = true;
+    
+    const loadInitialData = async () => {
+      try {
+        // Load customers first
+        await loadCustomers();
+        
+        if (!mounted) return;
+        
+        // Then load rentals and products in parallel
+        await Promise.all([
+          loadRentals(),
+          loadAvailableProducts()
+        ]);
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      }
+    };
+    
+    loadInitialData();
+    
+    return () => { mounted = false; };
+  }, [loadCustomers, loadRentals, loadAvailableProducts]);
 
   const handleSearch = (val: string) => {
     setSearchTerm(val);
@@ -357,5 +446,12 @@ export function useRentals() {
     validateStep1,
     validateStep2,
     validateStep3,
+    // Estados e funções para carregar cancelados e devolvidos sob demanda
+    loadingCancelled,
+    loadingReturned,
+    hasLoadedCancelled,
+    hasLoadedReturned,
+    loadCancelledRentals,
+    loadReturnedRentals,
   };
 }

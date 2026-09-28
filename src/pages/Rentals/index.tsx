@@ -216,6 +216,12 @@ export default function Rentals() {
     validateStep3,
     loadRentalDetails,
     rentalDetailsCache,
+    loadingCancelled,
+    loadingReturned,
+    hasLoadedCancelled,
+    hasLoadedReturned,
+    loadCancelledRentals,
+    loadReturnedRentals,
   } = useRentals();
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -248,6 +254,16 @@ export default function Rentals() {
     setExpandedRow(id);
   };
 
+  // Wrapper para handleStatusFilter para carregar cancelados/devolvidos sob demanda
+  const handleStatusFilterWrapper = (status: string) => {
+    if (status === 'cancelled' && !hasLoadedCancelled) {
+      loadCancelledRentals();
+    } else if (status === 'returned' && !hasLoadedReturned) {
+      loadReturnedRentals();
+    }
+    handleStatusFilter(status);
+  };
+
   const handleConfirmAction = async () => {
     if (!confirmRentalId || !confirmAction) return;
     
@@ -265,9 +281,11 @@ export default function Rentals() {
     setConfirmRentalId(null);
   };
 
-  const canReturn = (status: string) => ['active', 'picked_up', 'late', 'reserved'].includes(status);
-  const canCancel = (status: string) => ['budget', 'pending', 'active', 'reserved'].includes(status);
-  const canPay = (status: string) => status !== 'cancelled';
+  const canReturn = (status: string) => ['picked_up', 'late'].includes(status);
+  const canCancel = (status: string) => ['budget', 'reserved'].includes(status);
+  const canPay = (status: string) => ['budget', 'reserved', 'picked_up', 'late'].includes(status);
+  const canMarkAsPickedUp = (status: string) => ['budget', 'reserved'].includes(status);
+  const canEdit = (status: string) => ['budget', 'reserved', 'picked_up', 'late', 'cancelled'].includes(status);
 
   // Filtro local por busca
   const filteredRentals = useMemo(() => {
@@ -311,7 +329,7 @@ export default function Rentals() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
-            placeholder="Buscar por cliente, CPF ou ID..."
+            placeholder="Buscar cliente por nome ou CPF"
             className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition-all border border-gray-100"
             value={searchTerm}
             onChange={e => handleSearch(e.target.value)}
@@ -343,20 +361,26 @@ export default function Rentals() {
               {showOnlyNew ? 'Mostrar Todos' : 'Mostrar Novo'}
             </button>
           )}
-          {['', 'budget', 'active', 'picked_up', 'returned', 'late', 'cancelled', 'reserved'].map((status) => (
+          {['', 'budget', 'picked_up', 'late', 'reserved', 'returned', 'cancelled'].map((status) => {
+            const isLoading = (status === 'cancelled' && loadingCancelled) || (status === 'returned' && loadingReturned);
+            return (
             <button
               key={status}
-              onClick={() => handleStatusFilter(status)}
+              onClick={() => handleStatusFilterWrapper(status)}
+              disabled={isLoading}
               className={cn(
-                "px-4 py-2 rounded-full text-sm font-medium transition-all border",
+                "px-4 py-2 rounded-full text-sm font-medium transition-all border flex items-center gap-1",
                 statusFilter === status
                   ? "bg-rose-600 text-white border-rose-600"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-rose-300 hover:text-rose-600"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-rose-300 hover:text-rose-600",
+                isLoading && "opacity-50 cursor-wait"
               )}
             >
+              {isLoading && <Loader2 className="w-3 h-3 animate-spin" />}
               {status ? getStatusLabel(status) : 'Todos'}
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -430,7 +454,7 @@ export default function Rentals() {
                                   </span>
                                 )}
                               </p>
-                              <p className="text-xs text-gray-400">ID: {rental.id}</p>
+                              <p className="text-xs text-gray-400">CPF: {rental.customer_cpf || 'Não informado'}</p>
                             </div>
                           </div>
                         </td>
@@ -465,16 +489,18 @@ export default function Rentals() {
 
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-1">
-                            {/* EDITAR */}
-                            <StopPropagationButton
-                              onClick={() => openEditModal(rental.id)}
-                              title="Editar Aluguel"
-                              className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </StopPropagationButton>
+                            {/* EDITAR - para budget, reserved, picked_up, late, cancelled */}
+                            {canEdit(rental.status) && (
+                              <StopPropagationButton
+                                onClick={() => openEditModal(rental.id)}
+                                title="Editar Aluguel"
+                                className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </StopPropagationButton>
+                            )}
 
-                            {/* REGISTRAR PAGAMENTO */}
+                            {/* REGISTRAR PAGAMENTO - para budget, reserved, picked_up, late */}
                             {canPay(rental.status) && (
                               <StopPropagationButton
                                 onClick={() => handleActionClick('payment', rental.id)}
@@ -485,7 +511,18 @@ export default function Rentals() {
                               </StopPropagationButton>
                             )}
 
-                            {/* DEVOLVER */}
+                            {/* MARCAR COMO RETIRADO - para budget, reserved */}
+                            {canMarkAsPickedUp(rental.status) && (
+                              <StopPropagationButton
+                                onClick={() => handleActionClick('return', rental.id)}
+                                title="Marcar como Retirado"
+                                className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
+                              >
+                                <Truck className="w-4 h-4" />
+                              </StopPropagationButton>
+                            )}
+
+                            {/* REGISTRAR DEVOLUÇÃO - para picked_up, late */}
                             {canReturn(rental.status) && (
                               <StopPropagationButton
                                 onClick={() => handleActionClick('return', rental.id)}
@@ -496,18 +533,7 @@ export default function Rentals() {
                               </StopPropagationButton>
                             )}
 
-                            {/* RETIRAR (para orçamentos) */}
-                            {rental.status === 'budget' && (
-                              <StopPropagationButton
-                                onClick={() => handleActionClick('return', rental.id)}
-                                title="Marcar como Retirado"
-                                className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
-                              >
-                                <Truck className="w-4 h-4" />
-                              </StopPropagationButton>
-                            )}
-
-                            {/* CANCELAR */}
+                            {/* CANCELAR - para budget, reserved */}
                             {canCancel(rental.status) && (
                               <StopPropagationButton
                                 onClick={() => handleActionClick('cancel', rental.id)}

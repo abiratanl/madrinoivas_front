@@ -23,6 +23,7 @@ export interface Rental {
   id: string;
   customer_id?: string;
   customer_name?: string; // Nome do cliente (vem do getAll)
+  customer_cpf?: string; // CPF do cliente
   store_id: string;
   status: 'pending' | 'active' | 'picked_up' | 'returned' | 'late' | 'cancelled' | 'budget' | 'reserved';
   total_price: number;

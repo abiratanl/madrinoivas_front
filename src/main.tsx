@@ -7,6 +7,18 @@ import './index.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
 
+// Global error handlers
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    event.preventDefault();
+  });
+
+  window.addEventListener('error', (event) => {
+    console.error('Global error:', event.error);
+  });
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     {/* 1. Toaster: Fica no topo para flutuar sobre tudo */}

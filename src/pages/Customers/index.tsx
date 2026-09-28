@@ -161,36 +161,32 @@ export default function Customers() {
 
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-1">
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-1">
-                            {/* BOTÃO EDITAR */}
-                            <ActionButton
-                              icon={Edit2}
-                              variant="primary"
-                              onClick={() => openEditModal(c.id)}
-                              title="Editar Cliente"
-                            />
+                        {/* BOTÃO EDITAR */}
+                        <ActionButton
+                          icon={Edit2}
+                          variant="primary"
+                          onClick={() => openEditModal(c.id)}
+                          title="Editar Cliente"
+                        />
 
-                            {/* BOTÃO ALTERNAR STATUS (ATIVAR/INATIVAR) */}
-                            <ActionButton
-                              icon={RotateCcw}
-                              variant="ghost"
-                              onClick={() => toggleCustomerStatus(c.id, !!c.is_active)}
-                              title={c.is_active ? "Inativar Cliente" : "Ativar Cliente"}
-                              className={cn(
-                                c.is_active ? "hover:text-amber-600 hover:bg-amber-50" : "hover:text-green-600 hover:bg-green-50"
-                              )}
-                            />
+                        {/* BOTÃO ALTERNAR STATUS (ATIVAR/INATIVAR) */}
+                        <ActionButton
+                          icon={RotateCcw}
+                          variant="ghost"
+                          onClick={() => toggleCustomerStatus(c.id, !!c.is_active)}
+                          title={c.is_active ? "Inativar Cliente" : "Ativar Cliente"}
+                          className={cn(
+                            c.is_active ? "hover:text-amber-600 hover:bg-amber-50" : "hover:text-green-600 hover:bg-green-50"
+                          )}
+                        />
 
-                            {/* BOTÃO EXCLUIR */}
-                            <ActionButton
-                              icon={Trash}
-                              variant="danger"
-                              onClick={() => openDeleteConfirm(c.id)}
-                              title="Excluir Cliente"
-                            />
-                          </div>
-                        </td>
+                        {/* BOTÃO EXCLUIR */}
+                        <ActionButton
+                          icon={Trash}
+                          variant="danger"
+                          onClick={() => openDeleteConfirm(c.id)}
+                          title="Excluir Cliente"
+                        />
                       </div>
                     </td>
                   </tr>
