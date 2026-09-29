@@ -1,11 +1,14 @@
-import { useState, useMemo, Fragment } from 'react';
-import { UserPlus, Search, Package, Calendar, Loader2, RotateCcw, X, Check, AlertCircle, Trash2, ChevronDown, ChevronRight, Eye, Truck, Undo2, Ban, User, Edit2, DollarSign } from 'lucide-react';
+import { useState, useMemo, Fragment, useEffect } from 'react';
+import { UserPlus, Search, Package, Calendar, Loader2, RotateCcw, X, Check, AlertCircle, Trash2, ChevronDown, ChevronRight, Eye, Truck, Undo2, Ban, User, Edit2, DollarSign, FileText } from 'lucide-react';
 import { useRentals } from '../../hooks/useRentals';
+import { rentalService } from '../../services/rentalService';
 import { RentalModal } from './components/RentalModal';
+import { ContractModal } from './components/ContractModal';
 import { cn } from '../../utils/cn';
 import { ActionButton } from '../../components/common/ActionButton';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 function StopPropagationButton({ children, onClick, ...props }: { 
   children: React.ReactNode; 
@@ -204,6 +207,7 @@ export default function Rentals() {
     handlePrevStep,
     handleSubmit,
     handleReturn,
+    handlePickup,
     handleCancel,
     handleSearch,
     handleStatusFilter,
@@ -225,17 +229,89 @@ export default function Rentals() {
   } = useRentals();
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<'return' | 'cancel' | 'payment' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'return' | 'cancel' | 'payment' | 'pickup' | null>(null);
   const [confirmRentalId, setConfirmRentalId] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [expandingRow, setExpandingRow] = useState<string | null>(null);
   const [highlightedRentalId, setHighlightedRentalId] = useState<string | null>(null);
   const [showOnlyNew, setShowOnlyNew] = useState(false);
 
-  const handleActionClick = (action: 'return' | 'cancel' | 'payment', id: string) => {
+  const { selectedStore, user } = useAuth();
+  
+  // Store data for contract
+  const storeData = {
+    name: selectedStore?.name || 'Madrinoivas',
+    address: selectedStore?.address || 'Endereço não informado',
+    city: selectedStore?.city || 'Cidade',
+    state: selectedStore?.state || 'UF',
+    cnpj: selectedStore?.cnpj || '00.000.000/0000-00',
+    phone: selectedStore?.phone || '(00) 0000-0000',
+    email: selectedStore?.email || 'contato@madrinoivas.com',
+    digital_signature_base64: selectedStore?.digital_signature_base64,
+  };
+
+  // Contract modal state
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+  const [contractRental, setContractRental] = useState<any>(null);
+  const [contractCustomer, setContractCustomer] = useState<any>(null);
+  const [contractItems, setContractItems] = useState<any[]>([]);
+
+  const handleActionClick = (action: 'return' | 'cancel' | 'payment' | 'pickup' | 'contract', id: string) => {
+    if (action === 'contract') {
+      openContractModal(id);
+      return;
+    }
     setConfirmAction(action);
     setConfirmRentalId(id);
     setIsConfirmOpen(true);
+  };
+
+  const openContractModal = async (id: string) => {
+    try {
+      // Load rental details if not in cache
+      let rental = allRentals.find(r => r.id === id);
+      if (!rental) return;
+
+      // Ensure we have detailed rental data
+      if (!rental.items?.length) {
+        const detailed = await loadRentalDetails(id);
+        if (detailed) rental = detailed;
+      }
+
+      if (!rental) return; // TypeScript narrowing
+
+      const customer = customers.find(c => 
+        c.name.toLowerCase().trim() === (rental.customer_name || '').toLowerCase().trim()
+      );
+
+      // Build items with product details
+      const itemsWithProducts = (rental.items || []).map((item: any) => {
+        const product = availableProducts.find(p => p.id === item.product_id || p.id === item.id);
+        return {
+          product: product || {
+            id: item.product_id || item.id,
+            name: item.product?.name || item.name || 'Produto',
+            color: item.product?.color,
+            size: item.product?.size,
+            brand: item.product?.brand,
+            model: item.product?.model,
+            accessories: item.product?.accessories,
+            sale_price: item.product?.sale_price || item.product?.rental_price * 10,
+            rental_price: item.product?.rental_price || item.unit_price,
+          },
+          quantity: item.quantity || 1,
+          unit_price: item.unit_price || item.product?.rental_price || 0,
+        };
+      });
+
+      setContractRental(rental);
+      setContractCustomer(customer);
+      setContractItems(itemsWithProducts);
+      setIsContractModalOpen(true);
+    } catch (err) {
+      console.error('Erro ao abrir contrato:', err);
+      toast.error('Erro ao carregar dados do contrato');
+    }
   };
 
   const handleRowClick = async (id: string) => {
@@ -267,10 +343,45 @@ export default function Rentals() {
   const handleConfirmAction = async () => {
     if (!confirmRentalId || !confirmAction) return;
     
+    // Validar status antes de executar ações
+    const rental = allRentals.find(r => r.id === confirmRentalId);
+    console.log('handleConfirmAction:', { confirmAction, confirmRentalId, rental: rental?.status, allRentalsCount: allRentals.length });
+    
     if (confirmAction === 'return') {
+      if (!rental) {
+        toast.error('Aluguel não encontrado na lista.');
+        setIsConfirmOpen(false);
+        setConfirmAction(null);
+        setConfirmRentalId(null);
+        return;
+      }
+      console.log('Checking return status:', rental.status, canReturn(rental.status));
+      if (!canReturn(rental.status)) {
+        toast.error(`Não é possível devolver: status "${getStatusLabel(rental.status)}". Apenas "Retirado" ou "Atrasado" podem ser devolvidos.`);
+        setIsConfirmOpen(false);
+        setConfirmAction(null);
+        setConfirmRentalId(null);
+        return;
+      }
       await handleReturn(confirmRentalId);
     } else if (confirmAction === 'cancel') {
+      if (rental && !canCancel(rental.status)) {
+        toast.error(`Não é possível cancelar: status "${getStatusLabel(rental.status)}".`);
+        setIsConfirmOpen(false);
+        setConfirmAction(null);
+        setConfirmRentalId(null);
+        return;
+      }
       await handleCancel(confirmRentalId);
+    } else if (confirmAction === 'pickup') {
+      if (rental && !canMarkAsPickedUp(rental.status)) {
+        toast.error(`Não é possível marcar como retirado: status "${getStatusLabel(rental.status)}".`);
+        setIsConfirmOpen(false);
+        setConfirmAction(null);
+        setConfirmRentalId(null);
+        return;
+      }
+      await handlePickup(confirmRentalId);
     } else if (confirmAction === 'payment') {
       // TODO: Implementar modal de registro de pagamento
       toast('Funcionalidade de pagamento a ser implementada', { icon: '💰' });
@@ -299,7 +410,8 @@ export default function Rentals() {
     const term = searchTerm.toLowerCase();
     return result.filter(rental => {
       const customerName = (rental.customer_name || '').toLowerCase();
-      return customerName.includes(term) || String(rental.id).includes(term);
+      const customerCpf = (rental.customer_cpf || '').toLowerCase();
+      return customerName.includes(term) || customerCpf.includes(term) || String(rental.id).includes(term);
     });
   }, [allRentals, searchTerm, highlightedRentalId, showOnlyNew]);
 
@@ -377,7 +489,7 @@ export default function Rentals() {
               )}
             >
               {isLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-              {status ? getStatusLabel(status) : 'Todos'}
+              {status ? getStatusLabel(status) : 'Ativos'}
             </button>
             );
           })}
@@ -511,10 +623,21 @@ export default function Rentals() {
                               </StopPropagationButton>
                             )}
 
+                            {/* GERAR CONTRATO - para budget, reserved */}
+                            {(rental.status === 'budget' || rental.status === 'reserved') && (
+                              <StopPropagationButton
+                                onClick={() => handleActionClick('contract', rental.id)}
+                                title="Gerar Contrato"
+                                className="p-2 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-all active:scale-90"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </StopPropagationButton>
+                            )}
+
                             {/* MARCAR COMO RETIRADO - para budget, reserved */}
                             {canMarkAsPickedUp(rental.status) && (
                               <StopPropagationButton
-                                onClick={() => handleActionClick('return', rental.id)}
+                                onClick={() => handleActionClick('pickup', rental.id)}
                                 title="Marcar como Retirado"
                                 className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
                               >
@@ -591,6 +714,7 @@ export default function Rentals() {
         title={
           confirmAction === 'return' ? 'Confirmar Devolução' :
           confirmAction === 'cancel' ? 'Cancelar Aluguel' :
+          confirmAction === 'pickup' ? 'Marcar como Retirado' :
           'Registrar Pagamento'
         }
         description={
@@ -598,11 +722,14 @@ export default function Rentals() {
             ? 'Esta ação marcará o aluguel como devolvido e liberará os produtos para novo aluguel.'
             : confirmAction === 'cancel'
             ? 'Esta ação cancelará o aluguel. Somente aluguéis não retirados podem ser cancelados.'
+            : confirmAction === 'pickup'
+            ? 'Esta ação marcará o aluguel como retirado pelo cliente.'
             : 'Abrir tela para registrar pagamento deste aluguel.'
         }
         confirmText={
           confirmAction === 'return' ? 'Confirmar Devolução' :
           confirmAction === 'cancel' ? 'Sim, Cancelar' :
+          confirmAction === 'pickup' ? 'Confirmar Retirada' :
           'Registrar Pagamento'
         }
         variant={
@@ -625,8 +752,6 @@ export default function Rentals() {
           const createdRental = await handleSubmit(e);
           if (createdRental?.id) {
             setHighlightedRentalId(createdRental.id);
-            // Auto-expand the newly created rental
-            setExpandedRow(createdRental.id);
             // Clear highlight after 10 seconds
             setTimeout(() => setHighlightedRentalId(null), 10000);
           }
@@ -640,6 +765,29 @@ export default function Rentals() {
         validateStep2={validateStep2}
         validateStep3={validateStep3}
         getProductName={getProductName}
+      />
+
+      {/* MODAL DE CONTRATO */}
+      <ContractModal
+        isOpen={isContractModalOpen}
+        onClose={() => setIsContractModalOpen(false)}
+        rental={contractRental}
+        customer={contractCustomer}
+        store={storeData}
+        items={contractItems}
+        onGenerateContract={async (rentalId, signatureBase64) => {
+          const response = await rentalService.generateContract(rentalId, { lessee_signature: signatureBase64 });
+          return {
+            contractId: response.data?.id || response.id,
+            pdfUrl: response.data?.pdf_url || response.pdf_url,
+          };
+        }}
+        onSendEmail={async (contractId, email) => {
+          await rentalService.sendContractEmail(contractId, { email });
+        }}
+        onSendWhatsApp={async (contractId, phone) => {
+          await rentalService.sendContractWhatsApp(contractId, { phone });
+        }}
       />
     </div>
   );

@@ -38,6 +38,12 @@ export interface Rental {
     main_phone?: string;
   };
   discount?: number;
+  
+  // Campos para contrato
+  deposit_paid?: number; // Sinal pago
+  sinal?: number; // Alias para deposit_paid
+  extra_daily_rate?: number; // Valor da diária extra
+  daily_rate?: number; // Alias para extra_daily_rate
 }
 
 export const rentalService = {
@@ -64,7 +70,25 @@ export const rentalService = {
   // POST /:id/return - Realizar Devolução
   // O backend apenas altera status e libera produtos (clean return)
   returnRental: async (id: number | string) => {
-    const response = await api.post(`/rentals/${id}/return`);
+    try {
+      // Try sending return_date in case backend expects it
+      const response = await api.post(`/rentals/${id}/return`, {
+        return_date: new Date().toISOString().split('T')[0]
+      });
+      return response.data;
+    } catch (err: any) {
+      console.error('returnRental error:', {
+        status: err.response?.status,
+        data: JSON.stringify(err.response?.data, null, 2),
+        message: err.message
+      });
+      throw err;
+    }
+  },
+
+  // POST /:id/pickup - Marcar como Retirado
+  pickupRental: async (id: number | string) => {
+    const response = await api.post(`/rentals/${id}/pickup`);
     return response.data;
   },
 
@@ -79,5 +103,31 @@ export const rentalService = {
   update: async (id: number | string, data: CreateRentalDTO) => {
     const response = await api.put(`/rentals/${id}`, data);
     return response.data;
-  }
+  },
+
+  // CONTRATOS
+  
+  // POST /:id/contract - Gerar contrato com assinatura
+  generateContract: async (id: string, data: { lessee_signature: string }) => {
+    const response = await api.post(`/rentals/${id}/contract`, data);
+    return response.data;
+  },
+
+  // POST /:id/contract/send-email - Enviar contrato por email
+  sendContractEmail: async (id: string, data: { email: string }) => {
+    const response = await api.post(`/rentals/${id}/contract/send-email`, data);
+    return response.data;
+  },
+
+  // POST /:id/contract/send-whatsapp - Enviar contrato por WhatsApp
+  sendContractWhatsApp: async (id: string, data: { phone: string }) => {
+    const response = await api.post(`/rentals/${id}/contract/send-whatsapp`, data);
+    return response.data;
+  },
+
+  // GET /:id/contract/pdf - Baixar PDF do contrato
+  getContractPdf: async (id: string) => {
+    const response = await api.get(`/rentals/${id}/contract/pdf`, { responseType: 'blob' });
+    return response.data;
+  },
 };

@@ -6,6 +6,10 @@ export interface Store {
   address?: string;
   phone?: string;
   email?: string;
+  city?: string;
+  state?: string;
+  cnpj?: string;
+  digital_signature_base64?: string;
 }
 
 export const storeService = {

@@ -43,6 +43,10 @@ export function useRentals() {
   const rentalDetailsCacheRef = useRef(rentalDetailsCache);
   rentalDetailsCacheRef.current = rentalDetailsCache;
 
+  // Ref para acessar customers sem criar dependência no useCallback
+  const customersRef = useRef(customers);
+  customersRef.current = customers;
+
   // Estados para carregar cancelados e devolvidos sob demanda
   const [loadingCancelled, setLoadingCancelled] = useState(false);
   const [loadingReturned, setLoadingReturned] = useState(false);
@@ -53,10 +57,14 @@ export function useRentals() {
     setLoading(true);
     try {
       const data = await rentalService.getAll(filters);
+      console.log('loadRentals: customersRef.current.length =', customersRef.current.length);
       // Carrega apenas o resumo - detalhes serão carregados sob demanda
       let normalized = Array.isArray(data) ? data.map((r: any) => {
-        // Buscar CPF do cliente no array de clientes carregados (se disponível)
-        const customer = customers.find(c => String(c.id) === String(r.customer_id));
+        // API não retorna customer_id, então buscamos por nome
+        const customer = customersRef.current.find(c => 
+          c.name.toLowerCase().trim() === (r.customer_name || '').toLowerCase().trim()
+        );
+        console.log('Rental:', r.id, 'customer_name:', r.customer_name, 'found customer:', customer?.name, 'cpf:', customer?.cpf);
         return {
           ...r,
           total_price: parseFloat(r.total_amount || '0'),
@@ -72,6 +80,7 @@ export function useRentals() {
         normalized = normalized.filter(r => r.status !== 'cancelled' && r.status !== 'returned');
       }
       
+      console.log('Normalized rentals sample:', normalized.slice(0, 2));
       setRentals(normalized);
     } catch (error) {
       toast.error('Erro ao carregar aluguéis');
@@ -88,7 +97,10 @@ export function useRentals() {
     try {
       const data = await rentalService.getAll({ status: 'cancelled' });
       const normalized = Array.isArray(data) ? data.map((r: any) => {
-        const customer = customers.find(c => String(c.id) === String(r.customer_id));
+        // API não retorna customer_id, buscamos por nome
+        const customer = customersRef.current.find(c => 
+          c.name.toLowerCase().trim() === (r.customer_name || '').toLowerCase().trim()
+        );
         return {
           ...r,
           total_price: parseFloat(r.total_amount || '0'),
@@ -105,7 +117,7 @@ export function useRentals() {
     } finally {
       setLoadingCancelled(false);
     }
-  }, [customers, hasLoadedCancelled, loadingCancelled]);
+  }, [hasLoadedCancelled, loadingCancelled]);
 
   // Carregar devolvidos sob demanda
   const loadReturnedRentals = useCallback(async () => {
@@ -114,7 +126,10 @@ export function useRentals() {
     try {
       const data = await rentalService.getAll({ status: 'returned' });
       const normalized = Array.isArray(data) ? data.map((r: any) => {
-        const customer = customers.find(c => String(c.id) === String(r.customer_id));
+        // API não retorna customer_id, buscamos por nome
+        const customer = customersRef.current.find(c => 
+          c.name.toLowerCase().trim() === (r.customer_name || '').toLowerCase().trim()
+        );
         return {
           ...r,
           total_price: parseFloat(r.total_amount || '0'),
@@ -131,7 +146,7 @@ export function useRentals() {
     } finally {
       setLoadingReturned(false);
     }
-  }, [customers, hasLoadedReturned, loadingReturned]);
+  }, [hasLoadedReturned, loadingReturned]);
 
   // Carregar detalhes completos de um aluguel sob demanda
   const loadRentalDetails = useCallback(async (id: string) => {
@@ -351,23 +366,39 @@ export function useRentals() {
   };
 
   const handleReturn = async (id: string) => {
-    if (!window.confirm('Confirmar devolução deste aluguel?')) return;
-    
     try {
       await rentalService.returnRental(id);
-      toast.success('Devolução realizada!');
+      toast.success('Devolução realizada!', { icon: '✅' });
       loadRentals({ status: statusFilter || undefined });
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao devolver');
+      console.error('handleReturn error:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message
+      });
+      const backendMsg = err.response?.data?.message || err.response?.data?.error;
+      if (err.response?.status === 500) {
+        toast.error('Erro interno no servidor ao processar devolução. Verifique os logs do backend.', { duration: 5000 });
+      } else {
+        toast.error(backendMsg || 'Erro ao devolver');
+      }
+    }
+  };
+
+  const handlePickup = async (id: string) => {
+    try {
+      await rentalService.pickupRental(id);
+      toast.success('Aluguel marcado como retirado!', { icon: '🚚' });
+      loadRentals({ status: statusFilter || undefined });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Erro ao marcar como retirado');
     }
   };
 
   const handleCancel = async (id: string) => {
-    if (!window.confirm('Cancelar este aluguel?')) return;
-    
     try {
       await rentalService.cancelRental(id);
-      toast.success('Aluguel cancelado!');
+      toast.success('Aluguel cancelado!', { icon: '🚫' });
       loadRentals({ status: statusFilter || undefined });
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Erro ao cancelar');
@@ -434,6 +465,7 @@ export function useRentals() {
     handlePrevStep,
     handleSubmit,
     handleReturn,
+    handlePickup,
     handleCancel,
     handleSearch,
     handleStatusFilter,

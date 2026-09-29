@@ -52,6 +52,7 @@ export interface Customer {
 
   // Dados que vêm da query otimizada do findAll
   main_phone?: string;
+  email?: string; // email principal do contato
   city?: string;
 
   // Dados que vêm do findById (arrays aninhados)

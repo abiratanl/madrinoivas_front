@@ -8,8 +8,11 @@ export interface Product {
   size?: string;
   color?: string;
   brand?: string;
+  model?: string;
   purchase_price?: number;
   rental_price: number;
+  sale_price?: number;
+  accessories?: string;
   status: "available" | "rented" | "maintenance" | "retired";
   category_id: number;
   store_id: number;
