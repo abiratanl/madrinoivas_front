@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Check, User, Package, Calendar, ChevronLeft, Trash2, Plus, Minus, Search } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { Customer } from '../../../types/customer';
 import type { Product } from '../../../services/productService';
 import type { RentalProductItem } from '../../../services/rentalService';
+import { DayPicker } from 'react-day-picker';
+import { format, parse, isValid } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import 'react-day-picker/src/style.css';
 
 interface RentalModalProps {
   isOpen: boolean;
@@ -18,6 +22,7 @@ interface RentalModalProps {
     products: RentalProductItem[];
     status: 'budget' | 'reserved';
     discount?: number;
+    penalty_fee?: number;
   };
   setFormData: (data: any) => void;
   customers: Customer[];
@@ -32,6 +37,172 @@ interface RentalModalProps {
   validateStep2: () => boolean;
   validateStep3: () => boolean;
   getProductName: (id: string) => string;
+}
+
+// Date Picker Component with dd/mm/yyyy format and calendar
+function DatePickerBR({ 
+  value, 
+  onChange, 
+  label, 
+  minDate, 
+  required = false,
+  placeholder = 'dd/mm/aaaa'
+}: { 
+  value: string; 
+  onChange: (date: string) => void; 
+  label: string; 
+  minDate?: string; 
+  required?: boolean;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const parseBRDate = (str: string): Date | null => {
+    const parsed = parse(str, 'dd/MM/yyyy', new Date());
+    return isValid(parsed) ? parsed : null;
+  };
+
+  const parseISODate = (str: string): Date | null => {
+    const parsed = parse(str, 'yyyy-MM-dd', new Date());
+    return isValid(parsed) ? parsed : null;
+  };
+
+  const formatBRDate = (date: Date): string => format(date, 'dd/MM/yyyy', { locale: ptBR });
+  const formatISODate = (date: Date): string => format(date, 'yyyy-MM-dd');
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length > 2) val = val.slice(0, 2) + '/' + val.slice(2);
+    if (val.length > 5) val = val.slice(0, 5) + '/' + val.slice(5);
+    e.target.value = val;
+    const date = parseBRDate(val);
+    if (date) onChange(formatISODate(date));
+    else if (val === '') onChange('');
+  };
+
+  const handleBlur = () => {
+    if (inputRef.current?.value) {
+      const date = parseBRDate(inputRef.current.value);
+      if (date) inputRef.current.value = formatBRDate(date);
+      else { inputRef.current.value = ''; onChange(''); }
+    }
+    setIsOpen(false);
+  };
+
+  const handleDayClick = (day: Date | undefined) => {
+    if (!day) return;
+    onChange(formatISODate(day));
+    setIsOpen(false);
+    inputRef.current?.blur();
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const min = minDate ? (parseISODate(minDate) || undefined) : undefined;
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">{label}</label>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          required={required}
+          placeholder={placeholder}
+          maxLength={10}
+          className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500 pr-12"
+          value={value ? formatBRDate(parseISODate(value)!) : ''}
+          onChange={handleInputChange}
+          onFocus={() => setIsOpen(true)}
+          onBlur={handleBlur}
+        />
+        <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600" onClick={(e) => { e.preventDefault(); setIsOpen(!isOpen); }} tabIndex={-1}>
+          <Calendar className="w-5 h-5" />
+        </button>
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-2">
+          <DayPicker mode="single" selected={value ? parseISODate(value) || undefined : undefined} onSelect={handleDayClick} locale={ptBR} required={false} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Currency Input Component - allows free typing, formats on blur
+function CurrencyInputBR({ 
+  value, 
+  onChange, 
+  label, 
+  required = false,
+  placeholder = '0,00'
+}: { 
+  value: number; 
+  onChange: (value: number) => void; 
+  label: string; 
+  required?: boolean;
+  placeholder?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const formatBR = (num: number): string => {
+    if (num === 0) return '';
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const parseBR = (str: string): number => {
+    if (!str) return 0;
+    const cleaned = str.replace(/\./g, '').replace(',', '.');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const num = parseBR(e.target.value);
+    onChange(num);
+  };
+
+  const handleBlur = () => {
+    if (inputRef.current) {
+      const num = parseBR(inputRef.current.value);
+      inputRef.current.value = formatBR(num);
+      onChange(num);
+    }
+  };
+
+  const handleFocus = () => {
+    if (inputRef.current && inputRef.current.value) {
+      const num = parseBR(inputRef.current.value);
+      inputRef.current.value = num.toFixed(2).replace('.', ',');
+    }
+  };
+
+  const displayValue = value === 0 ? '' : formatBR(value);
+
+  return (
+    <div className="relative">
+      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">{label}</label>
+      <input
+        ref={inputRef}
+        type="text"
+        required={required}
+        placeholder={placeholder}
+        className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500 text-right"
+        value={displayValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        onFocus={handleFocus}
+      />
+    </div>
+  );
 }
 
 export function RentalModal({
@@ -306,51 +477,51 @@ export function RentalModal({
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Data de Início *</label>
-                  <input
-                    type="date"
-                    required
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500"
+                  <DatePickerBR
+                    label="Data de Início *"
                     value={formData.start_date}
-                    onChange={e => setFormData({ ...formData, start_date: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
+                    onChange={(date) => setFormData({ ...formData, start_date: date })}
+                    minDate={new Date().toISOString().split('T')[0]}
+                    required
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Data de Devolução Prevista *</label>
-                  <input
-                    type="date"
-                    required
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500"
+                  <DatePickerBR
+                    label="Data de Devolução Prevista *"
                     value={formData.end_date_scheduled}
-                    onChange={e => setFormData({ ...formData, end_date_scheduled: e.target.value })}
-                    min={formData.start_date || new Date().toISOString().split('T')[0]}
+                    onChange={(date) => setFormData({ ...formData, end_date_scheduled: date })}
+                    minDate={formData.start_date || new Date().toISOString().split('T')[0]}
+                    required
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Status</label>
-                <select
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500"
-                  value={formData.status}
-                  onChange={e => setFormData({ ...formData, status: e.target.value as 'budget' | 'reserved' })}
-                >
-                  <option value="budget">Orçamento</option>
-                  <option value="reserved">Reservado</option>
-                </select>
-              </div>
+              {/* Status, Desconto e Multa na mesma linha */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Status</label>
+                  <select
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500"
+                    value={formData.status}
+                    onChange={e => setFormData({ ...formData, status: e.target.value as 'budget' | 'reserved' })}
+                  >
+                    <option value="budget">Orçamento</option>
+                    <option value="reserved">Reservado</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Desconto (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500"
-                  value={formData.discount || ''}
-                  onChange={e => setFormData({ ...formData, discount: parseFloat(e.target.value) || 0 })}
-                  placeholder="0.00"
+                <CurrencyInputBR
+                  label="Desconto (R$)"
+                  value={formData.discount || 0}
+                  onChange={(val) => setFormData({ ...formData, discount: val })}
+                  required
+                />
+
+                <CurrencyInputBR
+                  label="Multa por Atraso (R$)"
+                  value={formData.penalty_fee || 0}
+                  onChange={(val) => setFormData({ ...formData, penalty_fee: val })}
+                  required
                 />
               </div>
 

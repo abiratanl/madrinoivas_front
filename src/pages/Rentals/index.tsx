@@ -60,8 +60,10 @@ function ExpandedRowContent({
   }, 0);
   
   const totalPrice = Number(detailed.total_price || detailed.total_amount || 0);
-  const discount = itemsSubtotal - totalPrice;
+  const penaltyFee = Number(detailed.penalty_fee || 0);
+  const discount = itemsSubtotal - totalPrice + penaltyFee;
   const hasDiscount = discount > 0.01;
+  const hasPenalty = penaltyFee > 0.01;
   
   const getItemCount = (rental: any) => (rental.items || []).reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
 
@@ -164,6 +166,14 @@ function ExpandedRowContent({
               <span className="font-medium">Desconto aplicado:</span>
               <span className="font-bold">
                 -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discount)}
+              </span>
+            </div>
+          )}
+          {hasPenalty && (
+            <div className="flex justify-between text-amber-600">
+              <span className="font-medium">Multa por atraso:</span>
+              <span className="font-bold">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(penaltyFee)}
               </span>
             </div>
           )}

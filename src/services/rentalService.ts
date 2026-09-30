@@ -11,11 +11,12 @@ export interface CreateRentalDTO {
   customer_id: string;
   start_date: string;       // Formato ISO ou YYYY-MM-DD
   end_date_scheduled: string;
-  products: RentalProductItem[]; // Array de produtos
+  products?: RentalProductItem[]; // Array de produtos (opcional para update)
   installments_config?: any;     // Configuração de parcelamento (se houver)
   store_id?: string;             // Opcional (backend pega do token se for vendedor)
   status?: 'budget' | 'reserved';  // Opcional (default costuma ser active ou budget)
   discount?: number;             // Desconto em reais
+  penalty_fee?: number;          // Valor da multa por atraso
 }
 
 // Interface de Leitura (O que vem do banco)
@@ -38,6 +39,7 @@ export interface Rental {
     main_phone?: string;
   };
   discount?: number;
+  penalty_fee?: number; // Valor da multa por atraso
   
   // Campos para contrato
   deposit_paid?: number; // Sinal pago

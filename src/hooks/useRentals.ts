@@ -12,6 +12,7 @@ export interface RentalFormData {
   products: RentalProductItem[];
   status: 'budget' | 'reserved';
   discount?: number;
+  penalty_fee?: number;
 }
 
 const initialFormState: RentalFormData = {
@@ -21,6 +22,7 @@ const initialFormState: RentalFormData = {
   products: [],
   status: 'budget',
   discount: 0,
+  penalty_fee: 0,
 };
 
 export function useRentals() {
@@ -32,8 +34,9 @@ export function useRentals() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
-  
+const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
+  const [originalProducts, setOriginalProducts] = useState<RentalProductItem[]>([]);
+   
   const [formData, setFormData] = useState<RentalFormData>(initialFormState);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -235,17 +238,21 @@ export function useRentals() {
       // API retorna { status: 'success', data: { ...rental } }
       const rental = response.data?.data || response.data || response;
       
+      const loadedProducts = rental.items?.map((item: any) => ({ 
+        id: item.product_id || item.productId || item.id, 
+        quantity: item.quantity || 1 
+      })) || [];
+      
       setFormData({
         customer_id: rental.customer_id || '',
         start_date: rental.start_date?.split('T')[0] || '',
         end_date_scheduled: rental.end_date_scheduled?.split('T')[0] || '',
-        products: rental.items?.map((item: any) => ({ 
-          id: item.product_id || item.productId || item.id, 
-          quantity: item.quantity || 1 
-        })) || [],
+        products: loadedProducts,
         status: rental.status === 'reserved' ? 'reserved' : 'budget',
         discount: rental.discount || 0,
+        penalty_fee: rental.penalty_fee || 0,
       });
+      setOriginalProducts(loadedProducts);
       setIsEditing(true);
       setEditingRentalId(id);
       setCurrentStep(2); // Start at step 2 (products) since client can't be changed
@@ -261,6 +268,7 @@ export function useRentals() {
     setFormData(initialFormState);
     setIsEditing(false);
     setEditingRentalId(null);
+    setOriginalProducts([]);
     setCurrentStep(1);
   };
 
@@ -330,15 +338,27 @@ export function useRentals() {
       return;
     }
 
+    // When editing, only include products if they've been modified
+    // If products array is empty or unchanged, backend keeps existing items
+    const productsChanged = isEditing 
+      ? JSON.stringify(formData.products.map(p => ({id: p.id, quantity: p.quantity})).sort()) 
+          !== JSON.stringify(originalProducts.map(p => ({id: p.id, quantity: p.quantity})).sort())
+      : true;
+    
     const payload: CreateRentalDTO = {
       customer_id: formData.customer_id,
       start_date: formData.start_date,
       end_date_scheduled: formData.end_date_scheduled,
-      products: formData.products,
       status: formData.status,
       store_id: String(storeId),
       discount: parseFloat(String(formData.discount || 0)),
+      penalty_fee: parseFloat(String(formData.penalty_fee || 0)),
     };
+
+    // Only include products when creating, or when editing and products actually changed
+    if (!isEditing || productsChanged) {
+      payload.products = formData.products;
+    }
 
     try {
       let createdRental: any = null;
