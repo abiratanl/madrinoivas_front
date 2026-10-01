@@ -21,6 +21,7 @@ const NotFound = lazy(() => import('../pages/NotFound/index'));
 // Admin / System Pages
 const Dashboard = lazy(() => import('../pages/Dashboard/index'));
 const Users = lazy(() => import('../pages/Users/index')); 
+const Stores = lazy(() => import('../pages/Stores/index'));
 const ClientPage = lazy(() => import('../pages/Clients/index')); 
 const Rentals = lazy(() => import('../pages/Rentals/index'));
 
@@ -98,7 +99,7 @@ export const router = createBrowserRouter([
           
           // --- MANAGEMENT AREA (Admin and Owner) ---
           {
-            element: <PrivateRoute allowedRoles={['admin', 'proprietario']} />,
+            element: <PrivateRoute allowedRoles={['admin', 'owner']} />,
             children: [
               {
                 path: "/dashboard", 
@@ -109,11 +110,15 @@ export const router = createBrowserRouter([
 
           // --- ADMINISTRATIVE AREA (Admin Only) ---
           {
-            element: <PrivateRoute allowedRoles={['admin', 'proprietario']} />,
+            element: <PrivateRoute allowedRoles={['admin', 'owner']} />,
             children: [
               {
                 path: "/users", 
                 element: (<Suspense fallback={<Loading />}><Users /></Suspense>)
+              },
+              {
+                path: "/stores", 
+                element: (<Suspense fallback={<Loading />}><Stores /></Suspense>)
               }
             ]
           },
@@ -121,7 +126,7 @@ export const router = createBrowserRouter([
           // --- OPERATIONAL AREA (Admin, Owner, Attendant) ---
           
           {
-            element: <PrivateRoute allowedRoles={['admin', 'proprietario', 'atendente']} />,
+            element: <PrivateRoute allowedRoles={['admin', 'owner', 'attendant']} />,
             children: [
               {
                 path: "/rentals", 
@@ -180,7 +185,7 @@ export const router = createBrowserRouter([
 
           // --- CUSTOMER AREA ---
           {
-            element: <PrivateRoute allowedRoles={['cliente']} />,
+            element: <PrivateRoute allowedRoles={['customer']} />,
             children: [
               {
                 path: "/client-area", 

@@ -443,7 +443,7 @@ export default function Rentals() {
   const canReturn = (status: string) => ['picked_up', 'late'].includes(status);
   const canCancel = (status: string) => ['budget', 'reserved'].includes(status);
   const canDelete = (status: string, userRole?: string) => {
-    const isAdminOrOwner = userRole && ['admin', 'proprietario'].includes(userRole.toLowerCase());
+    const isAdminOrOwner = userRole && ['admin', 'owner'].includes(userRole.toLowerCase());
     return isAdminOrOwner && status === 'cancelled';
   };
   const canPay = (status: string) => ['budget', 'reserved', 'picked_up', 'late'].includes(status);
@@ -724,7 +724,7 @@ export default function Rentals() {
                               </StopPropagationButton>
                             )}
 
-                            {/* EXCLUIR - apenas cancelados para admin/proprietario */}
+                            {/* EXCLUIR - apenas cancelados para admin/owner */}
                             {canDelete(rental.status, user?.role) && (
                               <StopPropagationButton
                                 onClick={() => handleActionClick('delete', rental.id)}

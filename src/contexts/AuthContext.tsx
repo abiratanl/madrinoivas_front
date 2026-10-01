@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Admin/Proprietário sem loja selecionada precisa escolher
   // Atendentes usam automaticamente sua loja do token (user.store_id)
-  const needsStoreSelection = !!(user && ['admin', 'proprietario'].includes(user.role.toLowerCase()) && !selectedStore && availableStores.length > 0);
+  const needsStoreSelection = !!(user && ['admin', 'owner'].includes(user.role.toLowerCase()) && !selectedStore && availableStores.length > 0);
 
   return (
     <AuthContext.Provider value={{ 

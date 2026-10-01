@@ -4,10 +4,10 @@ import api from './api';
 // --- Interfaces ---
 
 export interface User {
-  id: number; // CHANGED: from string to number (MySQL INT)
+  id: string; // UUID (char(36))
   name: string;
   email: string;
-  role: 'admin' | 'proprietario' | 'atendente' | 'cliente';
+  role: 'admin' | 'owner' | 'attendant' | 'customer';
   is_active: boolean | number;
 }
 
@@ -15,7 +15,7 @@ export interface CreateUserDTO {
   name: string;
   email: string;
   role: string;
-  store_id?: string | number | null;
+  store_id?: string | null;
 }
 
 // Better than 'any', defines exactly what can be updated
@@ -23,7 +23,7 @@ export interface UpdateUserDTO {
   name?: string;
   role?: string;
   is_active?: boolean;
-  store_id?: string | number | null;
+  store_id?: string | null;
 }
 
 // --- Service Object ---
@@ -51,7 +51,7 @@ export const userService = {
    * PUT /users/:id
    * Updates an existing user.
    */
-  update: async (id: number | string, data: UpdateUserDTO) => { 
+  update: async (id: string, data: UpdateUserDTO) => { 
     const response = await api.put(`/users/${id}`, data);
     return response.data;
   },
@@ -60,7 +60,7 @@ export const userService = {
    * DELETE /users/:id
    * Removes (or deactivates) a user.
    */
-  delete: async (id: number | string) => { 
+  delete: async (id: string) => { 
     const response = await api.delete(`/users/${id}`);
     return response.data;
   }

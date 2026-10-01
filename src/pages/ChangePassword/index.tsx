@@ -62,15 +62,15 @@ function ChangePassword() {
       if (response.data.token && responseData.user) {
         const userToSave = {
         ...responseData.user,
-        role: responseData.user.role || 'cliente' // Fallback de segurança
+        role: responseData.user.role || 'customer' // Fallback de segurança
     };
          signIn(response.data.token, userToSave);
          
-         const role = responseData.user.role?.toLowerCase();
-         if (role === 'admin') navigate('/users');
-         else if (role === 'proprietario') navigate('/dashboard');
-         else if (role === 'atendente') navigate('/rentals');
-         else navigate('/client-area');
+const role = responseData.user.role?.toLowerCase();
+          if (role === 'admin') navigate('/users');
+          else if (role === 'owner') navigate('/dashboard');
+          else if (role === 'attendant') navigate('/rentals');
+          else navigate('/client-area');
       } else {
         navigate('/auth/login');
       }

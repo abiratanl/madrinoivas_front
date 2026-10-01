@@ -4,17 +4,26 @@ import {
   Search,
   Edit2,
   Shield,
-  User,
+  User as UserIcon,
   Store,
-  RefreshCw,
   X,
-  Trash2,
   Filter,
   Crown,
+  UserX,
+  UserCheck,
 } from "lucide-react";
-import { useUsers } from "../../hooks/useUsers";
+import { useUsers, type User } from "../../hooks/useUsers";
 import { api } from "../../services/api";
 import { cn } from "../../utils/cn";
+import { ConfirmModal } from "../../components/common/ConfirmModal";
+import { toast } from "react-hot-toast";
+
+const roleLabels: Record<string, string> = {
+  admin: 'Administrador',
+  owner: 'Proprietário',
+  attendant: 'Atendente',
+  customer: 'Cliente',
+};
 
 interface StoreData {
   id: string;
@@ -28,17 +37,18 @@ function Users() {
     setFormData,
     isEditing,
     handleEdit,
-    handleDelete, // Renomeado logicamente para toggleStatus no hook, mas mantido aqui conforme sua chamada
+    handleToggleStatus,
     handleSubmit,
     resetForm,
-    // @ts-ignore - Certifique-se de adicionar esta função ao retorno do seu hook useUsers
-    softDeleteUser,
   } = useUsers();
 
   const [stores, setStores] = useState<StoreData[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmUserId, setConfirmUserId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'activate' | 'deactivate' | null>(null);
 
   // Carrega as lojas para o Select do formulário
   useEffect(() => {
@@ -54,24 +64,50 @@ function Users() {
     loadStores();
   }, []);
 
+  const handleToggleStatusClick = (user: User) => {
+    const isActive = user.is_active === true || user.is_active === 1;
+    setConfirmAction(isActive ? 'deactivate' : 'activate');
+    setConfirmUserId(String(user.id));
+    setIsConfirmOpen(true);
+  };
+
+  const handleConfirmToggle = async () => {
+    if (!confirmUserId || !confirmAction) return;
+    
+    try {
+      await handleToggleStatus(confirmUserId);
+      toast.success(
+        confirmAction === 'deactivate' 
+          ? 'Usuário inativado com sucesso' 
+          : 'Usuário ativado com sucesso'
+      );
+    } catch {
+      toast.error('Erro ao alterar status do usuário');
+    } finally {
+      setIsConfirmOpen(false);
+      setConfirmUserId(null);
+      setConfirmAction(null);
+    }
+  };
+
   const openCreateModal = () => {
     resetForm();
     setIsModalOpen(true);
   };
 
-  const openEditModal = (user: any) => {
+  const openEditModal = (user: User) => {
     handleEdit(user);
     setIsModalOpen(true);
   };
 
   // Filtro de pesquisa e status
-  const filteredUsers = users.filter((u) => {
+  const filteredUsers = users.filter((u: User) => {
     const matchesSearch =
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase());
 
     // Se o backend enviar deleted_at, filtramos para não mostrar excluídos no grid principal
-    // @ts-ignore
+    // @ts-expect-error - deleted_at may not exist in User type
     if (u.deleted_at) return false;
 
     const isActive = u.is_active === true || u.is_active === 1;
@@ -150,9 +186,6 @@ function Users() {
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">
                   Perfil / Loja
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">
-                  Status
-                </th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-right">
                   Ações
                 </th>
@@ -160,12 +193,13 @@ function Users() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredUsers.map((user) => {
+                const isActive = user.is_active === true || user.is_active === 1;
                 return (
                   <tr
                     key={user.id}
                     className={cn(
                       "hover:bg-gray-50 transition-colors",
-                      !(user.is_active === true || user.is_active === 1) && "opacity-60 bg-gray-50/50"
+                      !isActive && "opacity-60 bg-gray-50/50"
                     )}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -185,22 +219,47 @@ function Users() {
                       <div className="text-sm">
                         <div className="flex items-center gap-1.5 font-medium capitalize text-gray-700">
                           {user.role === "admin" && <Shield className="w-3.5 h-3.5 text-rose-500" />}
-                          {user.role === "proprietario" && <Crown className="w-3.5 h-3.5 text-amber-500" />}
-                          {user.role === "atendente" && <User className="w-3.5 h-3.5 text-blue-500" />}
-                          {user.role === "cliente" && <User className="w-3.5 h-3.5 text-gray-400" />}
-                          {user.role}
+                          {user.role === "owner" && <Crown className="w-3.5 h-3.5 text-amber-500" />}
+                          {user.role === "attendant" && <UserIcon className="w-3.5 h-3.5 text-blue-500" />}
+                          {user.role === "customer" && <UserIcon className="w-3.5 h-3.5 text-gray-400" />}
+                          {roleLabels[user.role] || user.role}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
                           <Store className="w-3 h-3" />
                           {
-                            ['admin', 'proprietario', 'cliente'].includes(user.role.toLowerCase())
+                            ['admin', 'owner', 'customer'].includes(user.role.toLowerCase())
                               ? "Geral"
                               : (
-                                // Busca o nome na lista de lojas usando o ID do usuário
                                 stores.find(s => s.id === user.store_id)?.name || "Loja não definida"
                               )
                           }
                         </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          onClick={() => openEditModal(user)}
+                          title="Editar Usuário"
+                          className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleStatusClick(user)}
+                          title={isActive ? "Inativar Usuário" : "Ativar Usuário"}
+                          className="p-2 rounded-lg text-gray-400 transition-all active:scale-90"
+                          style={{
+                            color: isActive ? undefined : '#22c55e',
+                            backgroundColor: isActive ? undefined : '#f0fdf4',
+                          }}
+                        >
+                          {isActive ? (
+                            <UserX className="w-4 h-4 text-red-500" />
+                          ) : (
+                            <UserCheck className="w-4 h-4 text-green-500" />
+                          )}
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -280,10 +339,10 @@ function Users() {
                       setFormData({ ...formData, role: e.target.value })
                     }
                   >
-                    <option value="atendente">Atendente</option>
+                    <option value="attendant">Atendente</option>
                     <option value="admin">Administrador</option>
-                    <option value="proprietario">Proprietário</option>
-                    <option value="cliente">Cliente</option>
+                    <option value="owner">Proprietário</option>
+                    <option value="customer">Cliente</option>
                   </select>
                 </div>
                 <div>
@@ -291,18 +350,18 @@ function Users() {
                     Loja Vínculo
                   </label>
                   <select
-                    required={formData.role === "atendente"}
-                    disabled={["cliente", "admin", "proprietario"].includes(
+                    required={formData.role === "attendant"}
+                    disabled={["customer", "admin", "owner"].includes(
                       formData.role,
                     )}
                     className={cn(
                       "w-full mt-1 px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-rose-500 outline-none bg-white transition-all",
-                      ["cliente", "admin", "proprietario"].includes(
+                      ["customer", "admin", "owner"].includes(
                         formData.role,
                       ) && "bg-gray-100 cursor-not-allowed opacity-60",
                     )}
                     value={
-                      ["cliente", "admin", "proprietario"].includes(
+                      ["customer", "admin", "owner"].includes(
                         formData.role,
                       )
                         ? ""
@@ -361,6 +420,25 @@ function Users() {
           </div>
         </div>
       )}
+
+      {/* CONFIRM MODAL */}
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        onClose={() => {
+          setIsConfirmOpen(false);
+          setConfirmUserId(null);
+          setConfirmAction(null);
+        }}
+        onConfirm={handleConfirmToggle}
+        title={confirmAction === 'deactivate' ? 'Inativar Usuário' : 'Ativar Usuário'}
+        description={
+          confirmAction === 'deactivate'
+            ? 'Tem certeza que deseja inativar este usuário? Ele não poderá mais acessar o sistema.'
+            : 'Tem certeza que deseja ativar este usuário? Ele terá acesso ao sistema novamente.'
+        }
+        confirmText={confirmAction === 'deactivate' ? 'Inativar' : 'Ativar'}
+        variant={confirmAction === 'deactivate' ? 'danger' : 'warning'}
+      />
     </div>
   );
 }

@@ -47,13 +47,13 @@ export function useLogin() {
                 case 'admin':
                     navigate('/users'); 
                     break;
-                case 'proprietario':
+                case 'owner':
                     navigate('/dashboard'); 
                     break;
-                case 'atendente':
+                case 'attendant':
                     navigate('/rentals'); 
                     break;
-                case 'cliente':
+                case 'customer':
                      navigate('/client-area'); 
                      break;
                 default:

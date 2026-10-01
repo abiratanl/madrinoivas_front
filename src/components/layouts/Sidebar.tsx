@@ -4,8 +4,15 @@ import UserProfileModal from '@/components/common/UserProfileModal';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Menu, X, LayoutDashboard, Calendar, Image,
-  Package, Tag, Contact2, Users as UsersIcon, UserCircle, LogOut
+  Package, Tag, Contact2, Users as UsersIcon, UserCircle, LogOut, Store
 } from 'lucide-react';
+
+const roleLabels: Record<string, string> = {
+  admin: 'Administrador',
+  owner: 'Proprietário',
+  attendant: 'Atendente',
+  customer: 'Cliente',
+};
 
 export function Sidebar() {
   const { user, signOut } = useAuth();
@@ -19,56 +26,62 @@ export function Sidebar() {
     navigate('/auth/login');
   };
 
-  const userRole = user?.role?.toLowerCase() || 'cliente';
+  const userRole = user?.role?.toLowerCase() || 'customer';
 
   // Definição dos itens de menu baseados no perfil
   const menuItems = [
     {
       label: 'Dashboard',
       path: '/dashboard',
-      roles: ['proprietario', 'admin'],
+      roles: ['owner', 'admin'],
       icon: <LayoutDashboard className="w-5 h-5" />
     },
     {
       label: 'Aluguéis',
       path: '/rentals',
-      roles: ['proprietario', 'atendente', 'admin'],
+      roles: ['owner', 'attendant', 'admin'],
       icon: <Calendar className="w-5 h-5" />
     },
     {
       label: 'Clientes',
       path: '/customers',
-      roles: ['proprietario', 'atendente', 'admin'],
+      roles: ['owner', 'attendant', 'admin'],
       icon: <Contact2 className="w-5 h-5" />
     },
     {
       label: 'Showroom',
       path: '/showroom',
-      roles: ['proprietario', 'atendente', 'admin'],
+      roles: ['owner', 'attendant', 'admin'],
       icon: <Image className="w-5 h-5" />
     },
     {
       label: 'Produtos',
       path: '/products',
-      roles: ['proprietario', 'atendente', 'admin'],
+      roles: ['owner', 'attendant', 'admin'],
       icon: <Package className="w-5 h-5" />
     },
     {
       label: 'Categorias',
       path: '/categories',
-      roles: ['proprietario', 'atendente', 'admin'],
+      roles: ['owner', 'attendant', 'admin'],
       icon: <Tag className="w-5 h-5" />
     },
     {
       label: 'Usuários',
       path: '/users',
-      roles: ['admin', 'proprietario'],
+      roles: ['admin'],
       icon: <UsersIcon className="w-5 h-5" />
+    },
+    {
+      label: 'Lojas',
+      path: '/stores',
+      roles: ['admin', 'owner'],
+      icon: <Store className="w-5 h-5" />
     },
     {
       label: 'Área do Cliente',
       path: '/client-area',
-      roles: ['cliente'],
+      roles: ['customer'],
       icon: <UserCircle className="w-5 h-5" />
     },
   ];
@@ -146,7 +159,7 @@ export function Sidebar() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white truncate">{user?.name || 'Usuário'}</p>
               <div className="flex items-center justify-between mt-0.5">
-                <p className="text-xs text-gray-500 capitalize truncate">{user?.role || 'Visitante'}</p>
+                <p className="text-xs text-gray-500 capitalize truncate">{roleLabels[user?.role || ''] || user?.role || 'Visitante'}</p>
               </div>
             </div>
           </div>
