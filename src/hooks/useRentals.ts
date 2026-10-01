@@ -13,6 +13,7 @@ export interface RentalFormData {
   status: 'budget' | 'reserved';
   discount?: number;
   penalty_fee?: number;
+  notes?: string;
 }
 
 const initialFormState: RentalFormData = {
@@ -23,6 +24,7 @@ const initialFormState: RentalFormData = {
   status: 'budget',
   discount: 0,
   penalty_fee: 0,
+  notes: '',
 };
 
 export function useRentals() {
@@ -56,10 +58,24 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
   const [hasLoadedCancelled, setHasLoadedCancelled] = useState(false);
   const [hasLoadedReturned, setHasLoadedReturned] = useState(false);
 
+  // Helper to compute late status based on business rule
+  const computeLateStatus = useCallback((rental: any) => {
+    if (rental.status !== 'picked_up') return rental.status;
+    if (!rental.end_date_scheduled) return rental.status;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const returnDate = new Date(rental.end_date_scheduled);
+    returnDate.setHours(0, 0, 0, 0);
+    return returnDate < today ? 'late' : rental.status;
+  }, []);
+
   const loadRentals = useCallback(async (filters?: { status?: string }) => {
     setLoading(true);
     try {
-      const data = await rentalService.getAll(filters);
+      const data = await rentalService.getAll({ 
+        ...filters, 
+        storeId: selectedStore?.id 
+      });
       console.log('loadRentals: customersRef.current.length =', customersRef.current.length);
       // Carrega apenas o resumo - detalhes serão carregados sob demanda
       let normalized = Array.isArray(data) ? data.map((r: any) => {
@@ -68,17 +84,23 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
           c.name.toLowerCase().trim() === (r.customer_name || '').toLowerCase().trim()
         );
         console.log('Rental:', r.id, 'customer_name:', r.customer_name, 'found customer:', customer?.name, 'cpf:', customer?.cpf);
-        return {
+        const baseRental = {
           ...r,
           total_price: parseFloat(r.total_amount || '0'),
           items: r.items || [],
           customer_name: r.customer_name || '',
           customer_cpf: customer?.cpf || r.customer?.cpf || r.customer_cpf || '',
         };
+        // Apply late status computation
+        return {
+          ...baseRental,
+          status: computeLateStatus(baseRental),
+        };
       }) : [];
       
       // Se não há filtro de status específico (carregamento inicial ou "Todos"), 
       // filtrar cancelados e devolvidos para melhor performance
+      // Manter 'late' visível na listagem principal
       if (!filters?.status) {
         normalized = normalized.filter(r => r.status !== 'cancelled' && r.status !== 'returned');
       }
@@ -91,7 +113,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [computeLateStatus]);
 
   // Carregar cancelados sob demanda
   const loadCancelledRentals = useCallback(async () => {
@@ -156,11 +178,16 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     if (rentalDetailsCacheRef.current[id]) return rentalDetailsCacheRef.current[id];
     
     try {
-      const fullRental = await rentalService.getById(id);
-      const detailed = {
+      const fullRental = await rentalService.getById(id, selectedStore?.id);
+      const baseDetailed = {
         ...fullRental,
         total_price: fullRental.total_price || parseFloat(fullRental.total_amount || '0'),
         items: fullRental.items || [],
+      };
+      // Apply late status computation
+      const detailed = {
+        ...baseDetailed,
+        status: computeLateStatus(baseDetailed),
       };
       setRentalDetailsCache(prev => ({ ...prev, [id]: detailed }));
       return detailed;
@@ -168,7 +195,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       console.error(`Erro ao buscar detalhes do aluguel ${id}:`, error);
       return null;
     }
-  }, []);
+  }, [computeLateStatus]);
 
   const loadCustomers = useCallback(async () => {
     try {
@@ -181,12 +208,15 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
 
   const loadAvailableProducts = useCallback(async () => {
     try {
-      const data = await productService.getAll({ status: 'available' });
+      const data = await productService.getAll({ 
+        status: 'available',
+        storeId: selectedStore?.id 
+      });
       setAvailableProducts(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar produtos', error);
     }
-  }, []);
+  }, [selectedStore?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -221,7 +251,13 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
 
   const handleStatusFilter = (status: string) => {
     setStatusFilter(status);
-    loadRentals({ status: status || undefined });
+    // Para 'late', não enviamos para a API pois é status computado client-side
+    // Carregamos 'picked_up' e o filtro local fará o resto
+    if (status === 'late') {
+      loadRentals({ status: 'picked_up' });
+    } else {
+      loadRentals({ status: status || undefined });
+    }
   };
 
   const openCreateModal = () => {
@@ -251,6 +287,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
         status: rental.status === 'reserved' ? 'reserved' : 'budget',
         discount: rental.discount || 0,
         penalty_fee: rental.penalty_fee || 0,
+        notes: rental.notes || '',
       });
       setOriginalProducts(loadedProducts);
       setIsEditing(true);
@@ -353,6 +390,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       store_id: String(storeId),
       discount: parseFloat(String(formData.discount || 0)),
       penalty_fee: parseFloat(String(formData.penalty_fee || 0)),
+      notes: formData.notes || undefined,
     };
 
     // Only include products when creating, or when editing and products actually changed
@@ -425,6 +463,17 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     }
   };
 
+  const handleDelete = async (id: string) => {
+    try {
+      await rentalService.deleteRental(id);
+      toast.success('Aluguel excluído permanentemente!', { icon: '🗑️' });
+      loadRentals({ status: statusFilter || undefined });
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Erro ao excluir aluguel';
+      toast.error(msg);
+    }
+  };
+
   const getProductName = (productId: string) => {
     const product = availableProducts.find(p => String(p.id) === String(productId));
     return product ? `${product.name} (${product.code})` : 'Produto não encontrado';
@@ -487,6 +536,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     handleReturn,
     handlePickup,
     handleCancel,
+    handleDelete,
     handleSearch,
     handleStatusFilter,
     getProductName,

@@ -25,6 +25,7 @@
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.69.0",
     "react-hot-toast": "^2.6.0",
+    "react-number-format": "^5.4.5",
     "react-router-dom": "^7.11.0",
     "react-toastify": "^11.1.0",
     "signature_pad": "^5.1.4",

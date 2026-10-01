@@ -185,6 +185,27 @@ function ExpandedRowContent({
           </div>
         </div>
       </div>
+
+      {/* Observações */}
+      {detailed.notes && (
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+          <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-2">
+            <FileText className="w-5 h-5 text-rose-600" />
+            Observações
+          </h4>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailed.notes}</p>
+        </div>
+      )}
+
+      {!detailed.notes && (
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+          <h4 className="font-bold text-gray-800 flex items-center gap-2 mb-2">
+            <FileText className="w-5 h-5 text-rose-600" />
+            Observações
+          </h4>
+          <p className="text-sm text-gray-400 italic">Nenhuma observação registrada</p>
+        </div>
+      )}
     </>
   );
 }
@@ -219,12 +240,12 @@ export default function Rentals() {
     handleReturn,
     handlePickup,
     handleCancel,
+    handleDelete,
     handleSearch,
     handleStatusFilter,
     getProductName,
     getStatusColor,
     getStatusLabel,
-    loadRentals,
     validateStep1,
     validateStep2,
     validateStep3,
@@ -239,7 +260,7 @@ export default function Rentals() {
   } = useRentals();
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<'return' | 'cancel' | 'payment' | 'pickup' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'return' | 'cancel' | 'payment' | 'pickup' | 'contract' | 'delete' | null>(null);
   const [confirmRentalId, setConfirmRentalId] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [expandingRow, setExpandingRow] = useState<string | null>(null);
@@ -266,7 +287,7 @@ export default function Rentals() {
   const [contractCustomer, setContractCustomer] = useState<any>(null);
   const [contractItems, setContractItems] = useState<any[]>([]);
 
-  const handleActionClick = (action: 'return' | 'cancel' | 'payment' | 'pickup' | 'contract', id: string) => {
+  const handleActionClick = (action: 'return' | 'cancel' | 'payment' | 'pickup' | 'contract' | 'delete', id: string) => {
     if (action === 'contract') {
       openContractModal(id);
       return;
@@ -347,6 +368,7 @@ export default function Rentals() {
     } else if (status === 'returned' && !hasLoadedReturned) {
       loadReturnedRentals();
     }
+    // 'late' é tratado dentro do handleStatusFilter (carrega picked_up e filtra client-side)
     handleStatusFilter(status);
   };
 
@@ -383,6 +405,22 @@ export default function Rentals() {
         return;
       }
       await handleCancel(confirmRentalId);
+    } else if (confirmAction === 'delete') {
+      if (!rental) {
+        toast.error('Aluguel não encontrado na lista.');
+        setIsConfirmOpen(false);
+        setConfirmAction(null);
+        setConfirmRentalId(null);
+        return;
+      }
+      if (!canDelete(rental.status, user?.role)) {
+        toast.error('Apenas administradores/proprietários podem excluir aluguéis cancelados permanentemente.');
+        setIsConfirmOpen(false);
+        setConfirmAction(null);
+        setConfirmRentalId(null);
+        return;
+      }
+      await handleDelete(confirmRentalId);
     } else if (confirmAction === 'pickup') {
       if (rental && !canMarkAsPickedUp(rental.status)) {
         toast.error(`Não é possível marcar como retirado: status "${getStatusLabel(rental.status)}".`);
@@ -404,16 +442,25 @@ export default function Rentals() {
 
   const canReturn = (status: string) => ['picked_up', 'late'].includes(status);
   const canCancel = (status: string) => ['budget', 'reserved'].includes(status);
+  const canDelete = (status: string, userRole?: string) => {
+    const isAdminOrOwner = userRole && ['admin', 'proprietario'].includes(userRole.toLowerCase());
+    return isAdminOrOwner && status === 'cancelled';
+  };
   const canPay = (status: string) => ['budget', 'reserved', 'picked_up', 'late'].includes(status);
   const canMarkAsPickedUp = (status: string) => ['budget', 'reserved'].includes(status);
   const canEdit = (status: string) => ['budget', 'reserved', 'picked_up', 'late', 'cancelled'].includes(status);
 
-  // Filtro local por busca
+  // Filtro local por busca e status
   const filteredRentals = useMemo(() => {
     let result = allRentals;
     
     if (showOnlyNew && highlightedRentalId) {
       result = result.filter(rental => rental.id === highlightedRentalId);
+    }
+    
+    // Filtrar por status (o status já vem computado do loadRentals com a regra de late)
+    if (statusFilter) {
+      result = result.filter(rental => rental.status === statusFilter);
     }
     
     if (!searchTerm.trim()) return result;
@@ -423,7 +470,7 @@ export default function Rentals() {
       const customerCpf = (rental.customer_cpf || '').toLowerCase();
       return customerName.includes(term) || customerCpf.includes(term) || String(rental.id).includes(term);
     });
-  }, [allRentals, searchTerm, highlightedRentalId, showOnlyNew]);
+  }, [allRentals, searchTerm, highlightedRentalId, showOnlyNew, statusFilter]);
 
   const getCustomer = (customerId: string) => customers.find(c => String(c.id) === String(customerId));
   const getItems = (rental: any) => rental.items || [];
@@ -677,11 +724,11 @@ export default function Rentals() {
                               </StopPropagationButton>
                             )}
 
-                            {/* EXCLUIR - apenas orçamentos cancelados */}
-                            {(rental.status === 'cancelled' || rental.status === 'budget') && (
+                            {/* EXCLUIR - apenas cancelados para admin/proprietario */}
+                            {canDelete(rental.status, user?.role) && (
                               <StopPropagationButton
-                                onClick={() => handleActionClick('cancel', rental.id)}
-                                title="Excluir"
+                                onClick={() => handleActionClick('delete', rental.id)}
+                                title="Excluir permanentemente"
                                 className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all active:scale-90"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -725,6 +772,7 @@ export default function Rentals() {
           confirmAction === 'return' ? 'Confirmar Devolução' :
           confirmAction === 'cancel' ? 'Cancelar Aluguel' :
           confirmAction === 'pickup' ? 'Marcar como Retirado' :
+          confirmAction === 'delete' ? 'Excluir Permanentemente' :
           'Registrar Pagamento'
         }
         description={
@@ -734,16 +782,19 @@ export default function Rentals() {
             ? 'Esta ação cancelará o aluguel. Somente aluguéis não retirados podem ser cancelados.'
             : confirmAction === 'pickup'
             ? 'Esta ação marcará o aluguel como retirado pelo cliente.'
+            : confirmAction === 'delete'
+            ? 'Esta ação excluirá PERMANENTEMENTE o aluguel cancelado. Esta ação NÃO PODE SER DESFEITA.'
             : 'Abrir tela para registrar pagamento deste aluguel.'
         }
         confirmText={
           confirmAction === 'return' ? 'Confirmar Devolução' :
           confirmAction === 'cancel' ? 'Sim, Cancelar' :
           confirmAction === 'pickup' ? 'Confirmar Retirada' :
+          confirmAction === 'delete' ? 'Sim, Excluir Permanentemente' :
           'Registrar Pagamento'
         }
         variant={
-          confirmAction === 'cancel' ? 'danger' : 'warning'
+          confirmAction === 'delete' || confirmAction === 'cancel' ? 'danger' : 'warning'
         }
       />
 

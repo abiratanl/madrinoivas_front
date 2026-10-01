@@ -48,6 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSelectedStoreState(stores[0]);
         localStorage.setItem('@MadriNoivas:selectedStoreId', String(stores[0].id));
       }
+      
+      // Auto-select store for attendants based on user.store_id from token
+      if (!selectedStore && user?.store_id && stores.length > 0) {
+        const userStore = stores.find((s: Store) => String(s.id) === String(user.store_id));
+        if (userStore) {
+          setSelectedStoreState(userStore);
+          localStorage.setItem('@MadriNoivas:selectedStoreId', String(userStore.id));
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar lojas:', error);
       // Even if store loading fails, we should still allow the app to work
@@ -116,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Admin/Proprietário sem loja selecionada precisa escolher
+  // Atendentes usam automaticamente sua loja do token (user.store_id)
   const needsStoreSelection = !!(user && ['admin', 'proprietario'].includes(user.role.toLowerCase()) && !selectedStore && availableStores.length > 0);
 
   return (

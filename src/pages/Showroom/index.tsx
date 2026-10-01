@@ -23,7 +23,7 @@ function Showroom() {
   // ==========================================
   // ESTADOS E HOOKS
   // ==========================================
-  const { user } = useAuth();
+  const { user, selectedStore } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +46,7 @@ function Showroom() {
     if (user?.store_id) {
       loadStoreConfig();
     }
-  }, [user]);
+  }, [user, selectedStore?.id]);
 
   async function loadStoreConfig() {
     if (!user?.store_id) return;
@@ -68,7 +68,7 @@ function Showroom() {
     try {
       setLoading(true);
       const [prodData, catData] = await Promise.all([
-        productService.getAll(),
+        productService.getAll({ storeId: selectedStore?.id }),
         categoryService.getAll()
       ]);
       const loadedProducts = Array.isArray(prodData) ? prodData : [];

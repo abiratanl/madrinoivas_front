@@ -8,6 +8,7 @@ import { DayPicker } from 'react-day-picker';
 import { format, parse, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import 'react-day-picker/src/style.css';
+import { NumericFormat } from 'react-number-format';
 
 interface RentalModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ interface RentalModalProps {
     status: 'budget' | 'reserved';
     discount?: number;
     penalty_fee?: number;
+    notes?: string;
   };
   setFormData: (data: any) => void;
   customers: Customer[];
@@ -137,7 +139,29 @@ function DatePickerBR({
   );
 }
 
-// Currency Input Component - allows free typing, formats on blur
+// Stable custom input component for NumericFormat - defined outside to maintain referential equality
+function NumericFormatCustomInput({ inputRef, onChange, onFocus, onBlur, required, placeholder, className, ...rest }: React.InputHTMLAttributes<HTMLInputElement> & { 
+  inputRef: React.Ref<HTMLInputElement>; 
+  onChange: React.ChangeEventHandler<HTMLInputElement>; 
+  onFocus: React.FocusEventHandler<HTMLInputElement>; 
+  onBlur: React.FocusEventHandler<HTMLInputElement>; 
+}) {
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      required={required}
+      placeholder={placeholder}
+      className={className}
+      {...rest}
+      onChange={onChange}
+      onFocus={onFocus}
+      onBlur={onBlur}
+    />
+  );
+}
+
+// Currency Input Component using react-number-format
 function CurrencyInputBR({ 
   value, 
   onChange, 
@@ -151,55 +175,22 @@ function CurrencyInputBR({
   required?: boolean;
   placeholder?: string;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const formatBR = (num: number): string => {
-    if (num === 0) return '';
-    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
-  const parseBR = (str: string): number => {
-    if (!str) return 0;
-    const cleaned = str.replace(/\./g, '').replace(',', '.');
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const num = parseBR(e.target.value);
-    onChange(num);
-  };
-
-  const handleBlur = () => {
-    if (inputRef.current) {
-      const num = parseBR(inputRef.current.value);
-      inputRef.current.value = formatBR(num);
-      onChange(num);
-    }
-  };
-
-  const handleFocus = () => {
-    if (inputRef.current && inputRef.current.value) {
-      const num = parseBR(inputRef.current.value);
-      inputRef.current.value = num.toFixed(2).replace('.', ',');
-    }
-  };
-
-  const displayValue = value === 0 ? '' : formatBR(value);
-
   return (
     <div className="relative">
       <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">{label}</label>
-      <input
-        ref={inputRef}
-        type="text"
+      <NumericFormat
+        customInput={NumericFormatCustomInput}
+        thousandSeparator="."
+        decimalSeparator=","
+        decimalScale={2}
+        fixedDecimalScale
+        value={value}
+        onValueChange={(values: { floatValue?: number; formattedValue?: string; value?: string }) => {
+          onChange(values.floatValue ?? 0);
+        }}
         required={required}
         placeholder={placeholder}
         className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500 text-right"
-        value={displayValue}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        onFocus={handleFocus}
       />
     </div>
   );
@@ -522,6 +513,19 @@ export function RentalModal({
                   value={formData.penalty_fee || 0}
                   onChange={(val) => setFormData({ ...formData, penalty_fee: val })}
                   required
+                />
+              </div>
+
+              {/* Observações */}
+              <div className="w-full md:col-span-3">
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Observações</label>
+                <textarea
+                  name="notes"
+                  rows={3}
+                  placeholder="Observações ou detalhes do aluguel..."
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                  value={formData.notes || ''}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 />
               </div>
 

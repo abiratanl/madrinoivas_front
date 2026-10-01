@@ -17,6 +17,7 @@ export interface CreateRentalDTO {
   status?: 'budget' | 'reserved';  // Opcional (default costuma ser active ou budget)
   discount?: number;             // Desconto em reais
   penalty_fee?: number;          // Valor da multa por atraso
+  notes?: string;                // Observações do aluguel
 }
 
 // Interface de Leitura (O que vem do banco)
@@ -40,6 +41,7 @@ export interface Rental {
   };
   discount?: number;
   penalty_fee?: number; // Valor da multa por atraso
+  notes?: string; // Observações do aluguel
   
   // Campos para contrato
   deposit_paid?: number; // Sinal pago
@@ -50,16 +52,19 @@ export interface Rental {
 
 export const rentalService = {
   // GET / - Listar aluguéis (aceita filtro de status)
-  getAll: async (filters?: { status?: string }) => {
+  getAll: async (filters?: { status?: string; storeId?: string | number }) => {
     const params: Record<string, string> = {};
     if (filters?.status) params.status = filters.status;
+    if (filters?.storeId) params.store_id = String(filters.storeId);
     const response = await api.get('/rentals', { params });
     return response.data.data || response.data;
   },
 
   // GET /:id - Detalhes do aluguel
-  getById: async (id: number | string) => {
-    const response = await api.get(`/rentals/${id}`);
+  getById: async (id: number | string, storeId?: string | number) => {
+    const params: Record<string, string> = {};
+    if (storeId) params.store_id = String(storeId);
+    const response = await api.get(`/rentals/${id}`, { params });
     return response.data.data || response.data;
   },
 
@@ -98,6 +103,13 @@ export const rentalService = {
   // Só permitido se não foi retirado (picked_up)
   cancelRental: async (id: number | string) => {
     const response = await api.post(`/rentals/${id}/cancel`);
+    return response.data;
+  },
+
+  // DELETE /:id - Hard Delete (Exclusão física)
+  // Apenas para admin/proprietario em registros com status 'cancelled'
+  deleteRental: async (id: number | string) => {
+    const response = await api.delete(`/rentals/${id}`);
     return response.data;
   },
 

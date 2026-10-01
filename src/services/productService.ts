@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { useAuth } from "../contexts/AuthContext";
 
 export interface Product {
   id: number;
@@ -31,6 +32,7 @@ export const productService = {
     categoryId?: string;
     globalSearch?: boolean;
     status?: string;
+    storeId?: string | number;
   }) => {
     const params = new URLSearchParams();
 
@@ -44,6 +46,11 @@ export const productService = {
 
     if (filters?.status) {
       params.append("status", filters.status);
+    }
+
+    // Pass store_id explicitly if provided (fallback for attendants with old tokens)
+    if (filters?.storeId) {
+      params.append("store_id", String(filters.storeId));
     }
 
     const queryString = params.toString();

@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { productService, type Product } from "../../services/productService";
 import { categoryService, type Category } from "../../services/categoryService";
+import { useAuth } from "../../contexts/AuthContext";
 
 function Products() {
+  const { selectedStore } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -19,7 +21,7 @@ function Products() {
   // Recarregar produtos se mudar o filtro ou o checkbox global
   useEffect(() => {
     loadProducts();
-  }, [selectedCategory, isGlobal]);
+  }, [selectedCategory, isGlobal, selectedStore?.id]);
 
   async function loadCategories() {
     try {
@@ -39,6 +41,7 @@ function Products() {
       const result = await productService.getAll({
         categoryId: selectedCategory,
         globalSearch: isGlobal,
+        storeId: selectedStore?.id,
       });
 
       console.log("Produtos carregados:", result); // Debug no console
