@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { storeService, type Store, type CreateStoreDTO, type UpdateStoreDTO, type StoreAddress } from '../services/storeService';
 
 interface StoreFormData {
@@ -27,6 +27,7 @@ export function useStores() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState<StoreFormData>({
     id: '', 
@@ -36,11 +37,7 @@ export function useStores() {
     addresses: [emptyAddress],
   });
 
-  useEffect(() => {
-    loadStores();
-  }, []);
-
-  const loadStores = async (showInactive = false) => {
+  const loadStores = useCallback(async (showInactive = false) => {
     try {
       setLoading(true);
       const response = await storeService.getAll(showInactive);
@@ -51,7 +48,7 @@ export function useStores() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleEdit = (store: Store) => {
     setFormData({
@@ -73,6 +70,9 @@ export function useStores() {
 
   const handleSubmit = async (e: React.FormEvent): Promise<boolean> => {
     e.preventDefault();
+    
+    if (submitting) return false;
+    setSubmitting(true);
     
     try {
       // Filter out empty address fields
@@ -105,6 +105,8 @@ export function useStores() {
         : 'Erro ao salvar loja.';
       alert(msg);
       return false;
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -119,7 +121,7 @@ export function useStores() {
 
   return {
     stores, loading, error, formData, setFormData,
-    isEditing, handleEdit, handleToggleActive, handleSubmit, resetForm
+    isEditing, handleEdit, handleToggleActive, handleSubmit, resetForm, loadStores, submitting
   };
 }
 

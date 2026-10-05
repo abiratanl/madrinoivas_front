@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { categoryService, type Category } from "../../services/categoryService";
+import { Edit2, Trash } from "lucide-react";
 
 function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -56,41 +57,43 @@ function Categories() {
 
       <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
         <table className="w-full bg-white text-left text-sm text-gray-500">
-          <thead className="bg-gray-50 text-xs uppercase text-gray-700">
+          <thead className="bg-gray-50 text-sm uppercase text-gray-700 font-semibold">
             <tr>
-              <th className="px-6 py-3">ID</th>
-              <th className="px-6 py-3">Nome</th>
-              <th className="px-6 py-3">Descrição</th>
-              <th className="px-6 py-3 text-right">Ações</th>
+              <th className="px-4 py-3">Nome</th>
+              <th className="px-4 py-3">Descrição</th>
+              <th className="px-4 py-3 text-right">Ações</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-100">
             {categories.map((cat) => (
               <tr key={cat.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4">{cat.id}</td>
-                <td className="px-6 py-4 font-medium text-gray-900">
+                <td className="px-4 py-3 font-semibold text-base text-gray-900">
                   {cat.name}
                 </td>
-                <td className="px-6 py-4">{cat.description || "-"}</td>
-                <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={() => navigate(`/categories/edit/${cat.id}`)}
-                    className="mr-3 font-medium text-blue-600 hover:underline"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(cat.id)}
-                    className="font-medium text-red-600 hover:underline"
-                  >
-                    Excluir
-                  </button>
+                <td className="px-4 py-2 text-gray-700">{cat.description || "-"}</td>
+                <td className="px-4 py-2 text-right">
+                  <div className="flex justify-end gap-1.5">
+                    <button
+                      onClick={() => navigate(`/categories/edit/${cat.id}`)}
+                      className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(cat.id)}
+                      className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all active:scale-90"
+                      title="Excluir"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
             {categories.length === 0 && (
               <tr>
-                <td colSpan={4} className="p-6 text-center text-gray-500">
+                <td colSpan={3} className="p-4 text-center text-gray-500">
                   Nenhuma categoria cadastrada.
                 </td>
               </tr>

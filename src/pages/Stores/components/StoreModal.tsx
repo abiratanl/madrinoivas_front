@@ -20,11 +20,12 @@ interface StoreModalProps {
   formData: StoreFormData;
   setFormData: (data: StoreFormData) => void;
   handleSubmit: (e: React.FormEvent) => Promise<boolean>;
+  submitting: boolean;
 }
 
 export function StoreModal({
   isOpen, onClose, isEditing, formData, setFormData,
-  handleSubmit
+  handleSubmit, submitting
 }: StoreModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -296,9 +297,10 @@ export function StoreModal({
             <button
               type="submit"
               form="store-form"
-              className="px-8 py-2.5 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 active:scale-95 transition-all"
+              disabled={submitting}
+              className="px-8 py-2.5 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isEditing ? 'Salvar Alterações' : 'Cadastrar Loja'}
+              {submitting ? 'Salvando...' : (isEditing ? 'Salvar Alterações' : 'Cadastrar Loja')}
             </button>
           )}
         </div>

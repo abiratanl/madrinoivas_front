@@ -27,10 +27,16 @@ function Stores() {
     handleToggleActive,
     handleSubmit,
     resetForm,
+    loadStores,
+    submitting,
   } = useStores();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+
+  useEffect(() => {
+    loadStores(showInactive);
+  }, [showInactive, loadStores]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [confirmStoreId, setConfirmStoreId] = useState<string | null>(null);
@@ -65,6 +71,10 @@ function Stores() {
           ? 'Loja inativada com sucesso' 
           : 'Loja ativada com sucesso'
       );
+      // Se ativou uma loja, reseta o filtro para mostrar apenas ativas
+      if (confirmAction === 'activate') {
+        setShowInactive(false);
+      }
     } catch (err) {
       toast.error('Erro ao alterar status da loja');
     } finally {
@@ -257,6 +267,7 @@ function Stores() {
         handleSubmit={async (e) => {
           return await handleSubmit(e);
         }}
+        submitting={submitting}
       />
 
       {/* CONFIRM MODAL */}
