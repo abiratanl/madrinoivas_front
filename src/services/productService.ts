@@ -1,7 +1,7 @@
 import { api } from "./api";
 
 export interface Product {
-  id: number;
+  id: string;
   code: string;
   name: string;
   description?: string;
@@ -32,16 +32,21 @@ export interface ProductTransfer {
   from_store_id: string;
   to_store_id: string;
   requested_by: string;
+  received_by: string | null;
   status: "pending" | "in_transit" | "completed" | "cancelled";
+  notes: string | null;
   requested_at: string;
   received_at: string | null;
   product?: Product;
   from_store?: { id: string; name: string };
   to_store?: { id: string; name: string };
+  requested_by_name?: string;
+  received_by_name?: string;
 }
 
 export interface TransferProductDTO {
   to_store_id: string;
+  notes?: string;
 }
 
 export interface ReceiveProductDTO {

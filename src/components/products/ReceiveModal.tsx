@@ -4,10 +4,14 @@ import { productService, type Product, type ReceiveProductDTO } from "../../serv
 import { cn } from "../../utils/cn";
 import { toast } from "react-hot-toast";
 
+interface ProductWithTransfer extends Product {
+  transfer_id?: string;
+}
+
 interface ReceiveModalProps {
   isOpen: boolean;
   onClose: () => void;
-  product: Product | null;
+  product: ProductWithTransfer | null;
   onSuccess: () => void;
 }
 
@@ -17,14 +21,14 @@ export function ReceiveModal({ isOpen, onClose, product, onSuccess }: ReceiveMod
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!product) return;
+    if (!product || !product.transfer_id) return;
 
     setSubmitting(true);
     setError("");
 
     try {
       const receiveData: ReceiveProductDTO = {
-        transfer_id: "", // The backend should find the active transfer for this product
+        transfer_id: product.transfer_id,
       };
 
       await productService.receive(product.id, receiveData);

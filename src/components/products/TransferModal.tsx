@@ -15,6 +15,7 @@ interface TransferModalProps {
 export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferModalProps) {
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
 
@@ -51,6 +52,7 @@ export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferM
     try {
       const transferData: TransferProductDTO = {
         to_store_id: selectedStoreId,
+        notes: notes.trim() || undefined,
       };
 
       await productService.transfer(product.id, transferData);
@@ -169,6 +171,27 @@ export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferM
                 {error}
               </p>
             )}
+          </div>
+
+          {/* Notes */}
+          <div className="mb-4">
+            <label htmlFor="transfer_notes" className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Observações (opcional)
+            </label>
+            <textarea
+              id="transfer_notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={submitting}
+              rows={3}
+              className={cn(
+                "w-full px-3 py-2 rounded-lg border bg-white",
+                "focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                "border-gray-300 text-gray-900"
+              )}
+              placeholder="Observações sobre a transferência..."
+            />
           </div>
 
           {selectedStoreId && (

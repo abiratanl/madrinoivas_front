@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { productService, type Product } from "../../services/productService";
+import { productService, type Product, type ProductTransfer } from "../../services/productService";
 import { categoryService, type Category } from "../../services/categoryService";
 import { useAuth } from "../../contexts/AuthContext";
-import { Edit2, Trash2, ArrowRightLeft, Package, Truck, CheckCircle, RotateCcw, AlertTriangle, Search } from "lucide-react";
+import { Edit2, Trash2, ArrowRightLeft, Package, Truck, CheckCircle, RotateCcw, AlertTriangle, Search, Wrench } from "lucide-react";
 import { TransferModal } from "../../components/products/TransferModal";
 import { ReceiveModal } from "../../components/products/ReceiveModal";
 import { ConfirmModal } from "../../components/common/ConfirmModal";
@@ -26,7 +26,7 @@ function Products() {
   const [receiveProduct, setReceiveProduct] = useState<Product | null>(null);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   // Confirmation modals
-  const [confirmAction, setConfirmAction] = useState<"discard" | "makeAvailable" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"discard" | "makeAvailable" | "sendToMaintenance" | null>(null);
   const [confirmProductId, setConfirmProductId] = useState<number | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
@@ -91,25 +91,48 @@ function Products() {
     setIsConfirmModalOpen(true);
   }
 
+  async function handleSendToMaintenance(id: number) {
+    setConfirmAction("sendToMaintenance");
+    setConfirmProductId(id);
+    setIsConfirmModalOpen(true);
+  }
+
   async function executeConfirmAction() {
     if (!confirmAction || !confirmProductId) return;
     
     const id = confirmProductId;
     try {
       const formData = new FormData();
-      const newStatus = confirmAction === "discard" ? "discarded" : "available";
+      let newStatus: string;
+      let successMessage: string;
+      let errorMessage: string;
+
+      switch (confirmAction) {
+        case "discard":
+          newStatus = "discarded";
+          successMessage = "Produto descartado!";
+          errorMessage = "Erro ao descartar produto.";
+          break;
+        case "makeAvailable":
+          newStatus = "available";
+          successMessage = "Produto disponível novamente!";
+          errorMessage = "Erro ao tornar produto disponível.";
+          break;
+        case "sendToMaintenance":
+          newStatus = "maintenance";
+          successMessage = "Produto enviado para manutenção!";
+          errorMessage = "Erro ao enviar produto para manutenção.";
+          break;
+        default:
+          return;
+      }
+
       formData.append("status", newStatus);
       await productService.update(id, formData);
       setProducts(products.map((p) => (p.id === id ? { ...p, status: newStatus } : p)));
-      toast.success(
-        confirmAction === "discard" ? "Produto descartado!" : "Produto disponível novamente!",
-        { style: { borderRadius: "10px", background: "#333", color: "#fff" } }
-      );
+      toast.success(successMessage, { style: { borderRadius: "10px", background: "#333", color: "#fff" } });
     } catch {
-      toast.error(
-        confirmAction === "discard" ? "Erro ao descartar produto." : "Erro ao tornar produto disponível.",
-        { style: { borderRadius: "10px", background: "#333", color: "#fff" } }
-      );
+      toast.error(errorMessage, { style: { borderRadius: "10px", background: "#333", color: "#fff" } });
     } finally {
       setConfirmAction(null);
       setConfirmProductId(null);
@@ -141,15 +164,52 @@ function Products() {
     setIsTransferModalOpen(true);
   }
 
-  function handleOpenReceive(product: Product) {
+  async function handleOpenReceive(product: Product) {
     if (product.status !== "transferring") {
       toast.error("Este produto não está em transferência.", {
         style: { borderRadius: "10px", background: "#333", color: "#fff" },
       });
       return;
     }
-    setReceiveProduct(product);
-    setIsReceiveModalOpen(true);
+    
+    // Buscar a transferência ativa para este produto
+    try {
+      const transfers = await productService.getTransfers(product.id);
+      console.log("Transferências encontradas:", transfers);
+      console.log("Loja do usuário:", selectedStore?.id);
+      
+      const activeTransfer = transfers.find(
+        (t: ProductTransfer) => t.status === "in_transit" && t.to_store_id === selectedStore?.id
+      );
+      
+      if (!activeTransfer) {
+        // Fallback: se não encontrar para a loja específica, pega qualquer in_transit
+        const anyActiveTransfer = transfers.find(
+          (t: ProductTransfer) => t.status === "in_transit"
+        );
+        
+        if (anyActiveTransfer) {
+          console.warn("Transferência encontrada mas para outra loja:", anyActiveTransfer.to_store_id);
+          // Usa a transferência encontrada mesmo sendo para outra loja
+          setReceiveProduct({ ...product, transfer_id: anyActiveTransfer.id });
+          setIsReceiveModalOpen(true);
+          return;
+        }
+        
+        toast.error("Nenhuma transferência pendente encontrada para este produto.", {
+          style: { borderRadius: "10px", background: "#333", color: "#fff" },
+        });
+        return;
+      }
+      
+      setReceiveProduct({ ...product, transfer_id: activeTransfer.id });
+      setIsReceiveModalOpen(true);
+    } catch (error) {
+      console.error("Erro ao buscar transferência:", error);
+      toast.error("Erro ao carregar informações da transferência.", {
+        style: { borderRadius: "10px", background: "#333", color: "#fff" },
+      });
+    }
   }
 
   function handleTransferSuccess() {
@@ -377,6 +437,17 @@ function Products() {
                         </button>
                       )}
 
+                      {/* Enviar para Manutenção - para available, reserved */}
+                      {["available", "reserved"].includes(product.status) && (
+                        <button
+                          onClick={() => handleSendToMaintenance(product.id)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 transition-all active:scale-90"
+                          title="Enviar para Manutenção"
+                        >
+                          <Wrench className="w-4 h-4" />
+                        </button>
+                      )}
+
                       {/* Tornar Disponível - para maintenance */}
                       {product.status === "maintenance" && (
                         <button
@@ -449,13 +520,21 @@ function Products() {
           setConfirmProductId(null);
         }}
         onConfirm={executeConfirmAction}
-        title={confirmAction === "discard" ? "Confirmar Descarte" : "Tornar Disponível"}
+        title={
+          confirmAction === "discard"
+            ? "Confirmar Descarte"
+            : confirmAction === "makeAvailable"
+            ? "Tornar Disponível"
+            : "Enviar para Manutenção"
+        }
         description={
           confirmAction === "discard"
             ? "O produto será marcado como descartado e não aparecerá mais nas listagens normais."
-            : "O produto voltará a ficar disponível para aluguel e transferência."
+            : confirmAction === "makeAvailable"
+            ? "O produto voltará a ficar disponível para aluguel e transferência."
+            : "O produto será marcado como em manutenção e não ficará disponível para aluguel até que retorne."
         }
-        confirmText={confirmAction === "discard" ? "Descartar" : "Confirmar"}
+        confirmText={confirmAction === "discard" ? "Descartar" : confirmAction === "makeAvailable" ? "Confirmar" : "Enviar"}
         variant={confirmAction === "discard" ? "danger" : "warning"}
       />
     </div>
