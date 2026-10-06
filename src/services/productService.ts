@@ -1,5 +1,4 @@
 import { api } from "./api";
-import { useAuth } from "../contexts/AuthContext";
 
 export interface Product {
   id: number;
@@ -14,16 +13,39 @@ export interface Product {
   rental_price: number;
   sale_price?: number;
   accessories?: string;
-  status: "available" | "rented" | "maintenance" | "retired";
+  status: "available" | "rented" | "maintenance" | "discarded" | "transferring" | "reserved";
   category_id: number;
   store_id: number;
   is_featured: boolean;
 
   // --- CAMPOS EXTRAS QUE VÊM DO JOIN ---
-  image_url?: string; // Foto de capa (Já está aí, ótimo!)
-  category_name?: string; // <--- ADICIONE ESTA LINHA (Para a coluna Categoria)
+  image_url?: string;
+  category_name?: string;
+  store_name?: string;
 
   images?: { id: number; url: string; url_thumb: string }[];
+}
+
+export interface ProductTransfer {
+  id: string;
+  product_id: string;
+  from_store_id: string;
+  to_store_id: string;
+  requested_by: string;
+  status: "pending" | "in_transit" | "completed" | "cancelled";
+  requested_at: string;
+  received_at: string | null;
+  product?: Product;
+  from_store?: { id: string; name: string };
+  to_store?: { id: string; name: string };
+}
+
+export interface TransferProductDTO {
+  to_store_id: string;
+}
+
+export interface ReceiveProductDTO {
+  transfer_id: string;
 }
 
 export const productService = {
@@ -94,5 +116,24 @@ export const productService = {
   delete: async (id: number | string) => {
     const response = await api.delete(`/products/${id}`);
     return response.data;
+  },
+
+  // 6. TRANSFERIR PRODUTO ENTRE LOJAS
+  transfer: async (productId: number | string, data: TransferProductDTO) => {
+    const response = await api.post(`/products/${productId}/transfer`, data);
+    return response.data;
+  },
+
+  // 7. RECEBER PRODUTO TRANSFERIDO
+  receive: async (productId: number | string, data: ReceiveProductDTO) => {
+    const response = await api.post(`/products/${productId}/receive`, data);
+    return response.data;
+  },
+
+  // 8. LISTAR TRANSFERÊNCIAS (Opcional - para histórico)
+  getTransfers: async (productId?: number | string) => {
+    const url = productId ? `/products/${productId}/transfers` : "/transfers";
+    const response = await api.get(url);
+    return response.data.data || response.data || [];
   },
 };

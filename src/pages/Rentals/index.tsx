@@ -1,11 +1,11 @@
-import { useState, useMemo, Fragment, useEffect } from 'react';
-import { UserPlus, Search, Package, Calendar, Loader2, RotateCcw, X, Check, AlertCircle, Trash2, ChevronDown, ChevronRight, Eye, Truck, Undo2, Ban, User, Edit2, DollarSign, FileText } from 'lucide-react';
+import { useState, useMemo, Fragment } from 'react';
+import { UserPlus, Search, Package, Calendar, Loader2, RotateCcw, Trash2, ChevronDown, ChevronRight, Truck, Undo2, Ban, User, Edit2, DollarSign, FileText } from 'lucide-react';
 import { useRentals } from '../../hooks/useRentals';
 import { rentalService } from '../../services/rentalService';
 import { RentalModal } from './components/RentalModal';
 import { ContractModal } from './components/ContractModal';
+import { ReturnModal } from '../../components/rentals/ReturnModal';
 import { cn } from '../../utils/cn';
-import { ActionButton } from '../../components/common/ActionButton';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
@@ -267,6 +267,10 @@ export default function Rentals() {
   const [highlightedRentalId, setHighlightedRentalId] = useState<string | null>(null);
   const [showOnlyNew, setShowOnlyNew] = useState(false);
 
+  // Return modal state
+  const [returnModalRentalId, setReturnModalRentalId] = useState<string | null>(null);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+
   const { selectedStore, user } = useAuth();
   
   // Store data for contract
@@ -290,6 +294,11 @@ export default function Rentals() {
   const handleActionClick = (action: 'return' | 'cancel' | 'payment' | 'pickup' | 'contract' | 'delete', id: string) => {
     if (action === 'contract') {
       openContractModal(id);
+      return;
+    }
+    if (action === 'return') {
+      setReturnModalRentalId(id);
+      setIsReturnModalOpen(true);
       return;
     }
     setConfirmAction(action);
@@ -379,24 +388,8 @@ export default function Rentals() {
     const rental = allRentals.find(r => r.id === confirmRentalId);
     console.log('handleConfirmAction:', { confirmAction, confirmRentalId, rental: rental?.status, allRentalsCount: allRentals.length });
     
-    if (confirmAction === 'return') {
-      if (!rental) {
-        toast.error('Aluguel não encontrado na lista.');
-        setIsConfirmOpen(false);
-        setConfirmAction(null);
-        setConfirmRentalId(null);
-        return;
-      }
-      console.log('Checking return status:', rental.status, canReturn(rental.status));
-      if (!canReturn(rental.status)) {
-        toast.error(`Não é possível devolver: status "${getStatusLabel(rental.status)}". Apenas "Retirado" ou "Atrasado" podem ser devolvidos.`);
-        setIsConfirmOpen(false);
-        setConfirmAction(null);
-        setConfirmRentalId(null);
-        return;
-      }
-      await handleReturn(confirmRentalId);
-    } else if (confirmAction === 'cancel') {
+    // 'return' is now handled by ReturnModal
+    if (confirmAction === 'cancel') {
       if (rental && !canCancel(rental.status)) {
         toast.error(`Não é possível cancelar: status "${getStatusLabel(rental.status)}".`);
         setIsConfirmOpen(false);
@@ -769,16 +762,13 @@ export default function Rentals() {
         onClose={() => { setIsConfirmOpen(false); setConfirmAction(null); setConfirmRentalId(null); }}
         onConfirm={handleConfirmAction}
         title={
-          confirmAction === 'return' ? 'Confirmar Devolução' :
           confirmAction === 'cancel' ? 'Cancelar Aluguel' :
           confirmAction === 'pickup' ? 'Marcar como Retirado' :
           confirmAction === 'delete' ? 'Excluir Permanentemente' :
           'Registrar Pagamento'
         }
         description={
-          confirmAction === 'return'
-            ? 'Esta ação marcará o aluguel como devolvido e liberará os produtos para novo aluguel.'
-            : confirmAction === 'cancel'
+          confirmAction === 'cancel'
             ? 'Esta ação cancelará o aluguel. Somente aluguéis não retirados podem ser cancelados.'
             : confirmAction === 'pickup'
             ? 'Esta ação marcará o aluguel como retirado pelo cliente.'
@@ -787,7 +777,6 @@ export default function Rentals() {
             : 'Abrir tela para registrar pagamento deste aluguel.'
         }
         confirmText={
-          confirmAction === 'return' ? 'Confirmar Devolução' :
           confirmAction === 'cancel' ? 'Sim, Cancelar' :
           confirmAction === 'pickup' ? 'Confirmar Retirada' :
           confirmAction === 'delete' ? 'Sim, Excluir Permanentemente' :
@@ -849,6 +838,21 @@ export default function Rentals() {
         onSendWhatsApp={async (contractId, phone) => {
           await rentalService.sendContractWhatsApp(contractId, { phone });
         }}
+      />
+
+      {/* MODAL DE DEVOLUÇÃO */}
+      <ReturnModal
+        isOpen={isReturnModalOpen}
+        onClose={() => {
+          setIsReturnModalOpen(false);
+          setReturnModalRentalId(null);
+        }}
+        onConfirm={async (makeAvailable) => {
+          if (returnModalRentalId) {
+            await handleReturn(returnModalRentalId, makeAvailable);
+          }
+        }}
+        rentalStatus={allRentals.find(r => r.id === returnModalRentalId)?.status || 'picked_up'}
       />
     </div>
   );

@@ -76,11 +76,11 @@ export const rentalService = {
 
   // POST /:id/return - Realizar Devolução
   // O backend apenas altera status e libera produtos (clean return)
-  returnRental: async (id: number | string) => {
+  returnRental: async (id: number | string, options?: { makeAvailable?: boolean; penaltyFee?: number }) => {
     try {
-      // Try sending return_date in case backend expects it
       const response = await api.post(`/rentals/${id}/return`, {
-        return_date: new Date().toISOString().split('T')[0]
+        makeAvailable: options?.makeAvailable || false,
+        penaltyFee: options?.penaltyFee || 0,
       });
       return response.data;
     } catch (err: any) {

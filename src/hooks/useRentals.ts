@@ -423,11 +423,17 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     }
   };
 
-  const handleReturn = async (id: string) => {
+  const handleReturn = async (id: string, makeAvailable = false) => {
     try {
-      await rentalService.returnRental(id);
-      toast.success('Devolução realizada!', { icon: '✅' });
-      loadRentals({ status: statusFilter || undefined });
+      await rentalService.returnRental(id, { makeAvailable });
+      const message = makeAvailable 
+        ? 'Devolução realizada! Produtos disponíveis.' 
+        : 'Devolução realizada! Produtos enviados para lavanderia.';
+      toast.success(message, { icon: '✅' });
+      await Promise.all([
+        loadRentals({ status: statusFilter || undefined }),
+        loadAvailableProducts()
+      ]);
     } catch (err: any) {
       console.error('handleReturn error:', {
         status: err.response?.status,
@@ -447,7 +453,10 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     try {
       await rentalService.pickupRental(id);
       toast.success('Aluguel marcado como retirado!', { icon: '🚚' });
-      loadRentals({ status: statusFilter || undefined });
+      await Promise.all([
+        loadRentals({ status: statusFilter || undefined }),
+        loadAvailableProducts()
+      ]);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Erro ao marcar como retirado');
     }
