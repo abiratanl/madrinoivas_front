@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { productService, type Product, type ProductTransfer } from "../../services/productService";
+import { productService, type Product, type ProductTransfer, type ProductWithTransfer } from "../../services/productService";
 import { categoryService, type Category } from "../../services/categoryService";
 import { useAuth } from "../../contexts/AuthContext";
 import { Edit2, Trash2, ArrowRightLeft, Package, Truck, CheckCircle, RotateCcw, AlertTriangle, Search, Wrench } from "lucide-react";
@@ -14,7 +14,7 @@ function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("available");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isGlobal, setIsGlobal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,11 +23,11 @@ function Products() {
   // Modal states
   const [transferProduct, setTransferProduct] = useState<Product | null>(null);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-  const [receiveProduct, setReceiveProduct] = useState<Product | null>(null);
+  const [receiveProduct, setReceiveProduct] = useState<ProductWithTransfer | null>(null);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   // Confirmation modals
   const [confirmAction, setConfirmAction] = useState<"discard" | "makeAvailable" | "sendToMaintenance" | null>(null);
-  const [confirmProductId, setConfirmProductId] = useState<number | null>(null);
+  const [confirmProductId, setConfirmProductId] = useState<string | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const loadCategories = async () => {
@@ -43,8 +43,10 @@ function Products() {
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
+    let allProducts: Product[] = [];
+
     try {
-      // Busca os produtos (já retorna array limpo do service)
+      // Busca os produtos da loja do atendente (já retorna array limpo do service)
       const result = await productService.getAll({
         categoryId: selectedCategory,
         globalSearch: isGlobal,
@@ -52,21 +54,46 @@ function Products() {
         status: selectedStatus,
       });
 
-      console.log("Produtos carregados:", result); // Debug no console
-
-      if (Array.isArray(result)) {
-        setProducts(result);
-      } else {
-        setProducts([]);
-      }
+      allProducts = Array.isArray(result) ? result : [];
     } catch (error) {
-      console.error(error);
-      toast.error("Erro ao carregar produtos.", {
-        style: { borderRadius: "10px", background: "#333", color: "#fff" },
-      });
-    } finally {
-      setLoading(false);
+      console.error("[Products] Erro ao buscar produtos da loja:", error);
+      // Continue mesmo com erro para tentar buscar produtos em transferência
+      allProducts = [];
     }
+
+    // Se não é busca global e há uma loja selecionada, buscar também produtos em transferência PARA esta loja
+    if (!isGlobal && selectedStore?.id) {
+      try {
+        console.log("[Products] Buscando produtos em transferência para loja:", selectedStore.id);
+        const transferringProducts = await productService.getTransferringToStore(selectedStore.id);
+        console.log("[Products] Produtos em transferência encontrados:", transferringProducts);
+        
+        // Filtrar por categoria se necessário
+        let filteredTransferring = transferringProducts;
+        if (selectedCategory) {
+          filteredTransferring = transferringProducts.filter(
+            (p) => String(p.category_id) === selectedCategory
+          );
+        }
+        // Filtrar por status se necessário (produtos em transferência têm status "transferring")
+        if (selectedStatus && selectedStatus !== "transferring") {
+          filteredTransferring = filteredTransferring.filter(
+            (p) => p.status === selectedStatus
+          );
+        }
+        // Merge evitando duplicados (pelo ID do produto)
+        const existingIds = new Set(allProducts.map((p) => p.id));
+        const newProducts = filteredTransferring.filter((p) => !existingIds.has(p.id));
+        allProducts = [...allProducts, ...newProducts];
+      } catch (transferError) {
+        console.error("[Products] Erro ao buscar produtos em transferência:", transferError);
+      }
+    }
+
+    console.log("Produtos carregados:", allProducts); // Debug no console
+
+    setProducts(allProducts);
+    setLoading(false);
   }, [selectedCategory, isGlobal, selectedStore?.id, selectedStatus]);
 
   // Carregar categorias ao abrir a tela
@@ -79,19 +106,19 @@ function Products() {
     loadProducts();
   }, [loadProducts]);
 
-  async function handleDiscard(id: number) {
+  async function handleDiscard(id: string) {
     setConfirmAction("discard");
     setConfirmProductId(id);
     setIsConfirmModalOpen(true);
   }
 
-  async function handleMakeAvailable(id: number) {
+  async function handleMakeAvailable(id: string) {
     setConfirmAction("makeAvailable");
     setConfirmProductId(id);
     setIsConfirmModalOpen(true);
   }
 
-  async function handleSendToMaintenance(id: number) {
+  async function handleSendToMaintenance(id: string) {
     setConfirmAction("sendToMaintenance");
     setConfirmProductId(id);
     setIsConfirmModalOpen(true);
@@ -101,32 +128,32 @@ function Products() {
     if (!confirmAction || !confirmProductId) return;
     
     const id = confirmProductId;
+    let newStatus: Product["status"];
+    let successMessage: string;
+    let errorMessage: string;
+
+    switch (confirmAction) {
+      case "discard":
+        newStatus = "discarded";
+        successMessage = "Produto descartado!";
+        errorMessage = "Erro ao descartar produto.";
+        break;
+      case "makeAvailable":
+        newStatus = "available";
+        successMessage = "Produto disponível novamente!";
+        errorMessage = "Erro ao tornar produto disponível.";
+        break;
+      case "sendToMaintenance":
+        newStatus = "maintenance";
+        successMessage = "Produto enviado para manutenção!";
+        errorMessage = "Erro ao enviar produto para manutenção.";
+        break;
+      default:
+        return;
+    }
+
     try {
       const formData = new FormData();
-      let newStatus: string;
-      let successMessage: string;
-      let errorMessage: string;
-
-      switch (confirmAction) {
-        case "discard":
-          newStatus = "discarded";
-          successMessage = "Produto descartado!";
-          errorMessage = "Erro ao descartar produto.";
-          break;
-        case "makeAvailable":
-          newStatus = "available";
-          successMessage = "Produto disponível novamente!";
-          errorMessage = "Erro ao tornar produto disponível.";
-          break;
-        case "sendToMaintenance":
-          newStatus = "maintenance";
-          successMessage = "Produto enviado para manutenção!";
-          errorMessage = "Erro ao enviar produto para manutenção.";
-          break;
-        default:
-          return;
-      }
-
       formData.append("status", newStatus);
       await productService.update(id, formData);
       setProducts(products.map((p) => (p.id === id ? { ...p, status: newStatus } : p)));
@@ -178,14 +205,16 @@ function Products() {
       console.log("Transferências encontradas:", transfers);
       console.log("Loja do usuário:", selectedStore?.id);
       
+      const userStoreId = String(selectedStore?.id);
+      
       const activeTransfer = transfers.find(
-        (t: ProductTransfer) => t.status === "in_transit" && t.to_store_id === selectedStore?.id
+        (t: ProductTransfer) => t.status === "active" && String(t.to_store_id) === userStoreId
       );
       
       if (!activeTransfer) {
-        // Fallback: se não encontrar para a loja específica, pega qualquer in_transit
+        // Fallback: se não encontrar para a loja específica, pega qualquer active
         const anyActiveTransfer = transfers.find(
-          (t: ProductTransfer) => t.status === "in_transit"
+          (t: ProductTransfer) => t.status === "active"
         );
         
         if (anyActiveTransfer) {

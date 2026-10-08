@@ -33,7 +33,7 @@ export interface ProductTransfer {
   to_store_id: string;
   requested_by: string;
   received_by: string | null;
-  status: "pending" | "in_transit" | "completed" | "cancelled";
+  status: "active" | "completed" | "cancelled";
   notes: string | null;
   requested_at: string;
   received_at: string | null;
@@ -42,6 +42,10 @@ export interface ProductTransfer {
   to_store?: { id: string; name: string };
   requested_by_name?: string;
   received_by_name?: string;
+}
+
+export interface ProductWithTransfer extends Product {
+  transfer_id: string;
 }
 
 export interface TransferProductDTO {
@@ -139,6 +143,68 @@ export const productService = {
   getTransfers: async (productId?: number | string) => {
     const url = productId ? `/products/${productId}/transfers` : "/transfers";
     const response = await api.get(url);
-    return response.data.data || response.data || [];
+    const transfers = response.data.data || response.data || [];
+    // Backend returns transfer_id as the transfer ID, map it to id for frontend interface
+    return transfers.map((t: any) => ({
+      ...t,
+      id: t.transfer_id || t.id
+    }));
+  },
+
+  // 9. LISTAR PRODUTOS EM TRANSFERÊNCIA PARA UMA LOJA ESPECÍFICA
+  getTransferringToStore: async (storeId: string | number): Promise<ProductWithTransfer[]> => {
+    console.log("[productService.getTransferringToStore] Buscando para storeId:", storeId);
+    // Try with query parameters first (if backend supports it)
+    let transfers: ProductTransfer[] = [];
+    try {
+      const params = new URLSearchParams();
+      params.append("to_store_id", String(storeId));
+      params.append("status", "active");
+      console.log("[productService.getTransferringToStore] Tentando com query params:", params.toString());
+      const response = await api.get(`/transfers?${params.toString()}`);
+      transfers = response.data.data || response.data || [];
+      // Backend returns transfer_id as the transfer ID, map it to id for frontend interface
+      transfers = transfers.map((t: any) => ({ ...t, id: t.transfer_id || t.id }));
+      console.log("[productService.getTransferringToStore] Resposta com query params:", transfers);
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { status?: number } };
+      if (axiosError.response?.status === 403) {
+        console.warn("[productService.getTransferringToStore] Sem permissão para acessar /transfers (403)");
+      } else {
+        console.warn("[productService.getTransferringToStore] Query params falhou, tentando fallback:", error);
+      }
+      // Fallback: fetch all transfers and filter locally
+      try {
+        const response = await api.get("/transfers");
+        const allTransfers = response.data.data || response.data || [];
+        console.log("[productService.getTransferringToStore] Todas as transferências (fallback):", allTransfers);
+        // Backend returns transfer_id as the transfer ID, map it to id for frontend interface
+        const mappedTransfers = allTransfers.map((t: any) => ({ ...t, id: t.transfer_id || t.id }));
+        transfers = mappedTransfers.filter(
+          (t: ProductTransfer) => String(t.to_store_id) === String(storeId) && t.status === "active"
+        );
+        console.log("[productService.getTransferringToStore] Transferências filtradas (fallback):", transfers);
+      } catch (fallbackError) {
+        console.error("[productService.getTransferringToStore] Fallback também falhou:", fallbackError);
+        transfers = [];
+      }
+    }
+    
+    // Use product data from transfer join (transfer.product) instead of separate API calls
+    // Attendants may not have permission to access /products/{id} endpoint
+    const productsWithTransfers = transfers.map((transfer: ProductTransfer) => {
+      const product = transfer.product;
+      if (!product) {
+        console.warn("[productService.getTransferringToStore] Transfer sem produto no join:", transfer.id);
+        return null;
+      }
+      return {
+        ...product,
+        transfer_id: transfer.id,
+      } as Product & { transfer_id: string };
+    }).filter((p): p is ProductWithTransfer => p !== null);
+    
+    console.log("[productService.getTransferringToStore] Produtos finais (do join):", productsWithTransfers);
+    return productsWithTransfers;
   },
 };
