@@ -34,33 +34,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [selectedStore, setSelectedStoreState] = useState<Store | null>(null);
   const [availableStores, setAvailableStores] = useState<Store[]>([]);
 
-  const loadStores = async () => {
+  const loadStores = async (userData?: User) => {
+    // Use passed userData or fallback to state user (for signIn timing)
+    const currentUser = userData || user;
+    let stores: Store[] = [];
     try {
-      const stores = await storeService.getAll();
+      stores = await storeService.getAll();
       setAvailableStores(stores);
-      // Restore selected store from localStorage
-      const savedStoreId = localStorage.getItem('@MadriNoivas:selectedStoreId');
-      if (savedStoreId && stores.length > 0) {
-        const store = stores.find((s: Store) => String(s.id) === savedStoreId);
-        if (store) setSelectedStoreState(store);
-      } else if (stores.length === 1) {
-        // Auto-select if only one store
-        setSelectedStoreState(stores[0]);
-        localStorage.setItem('@MadriNoivas:selectedStoreId', String(stores[0].id));
-      }
-      
-      // Auto-select store for attendants based on user.store_id from token
-      if (!selectedStore && user?.store_id && stores.length > 0) {
-        const userStore = stores.find((s: Store) => String(s.id) === String(user.store_id));
-        if (userStore) {
-          setSelectedStoreState(userStore);
-          localStorage.setItem('@MadriNoivas:selectedStoreId', String(userStore.id));
-        }
-      }
     } catch (error) {
       console.error('Erro ao carregar lojas:', error);
       // Even if store loading fails, we should still allow the app to work
       setAvailableStores([]);
+    }
+
+    // Restore selected store from localStorage
+    const savedStoreId = localStorage.getItem('@MadriNoivas:selectedStoreId');
+    if (savedStoreId && stores.length > 0) {
+      const store = stores.find((s: Store) => String(s.id) === savedStoreId);
+      if (store) setSelectedStoreState(store);
+    } else if (stores.length === 1) {
+      // Auto-select if only one store
+      setSelectedStoreState(stores[0]);
+      localStorage.setItem('@MadriNoivas:selectedStoreId', String(stores[0].id));
+    }
+    
+    // Auto-select store for attendants based on user.store_id from token
+    // This runs even if stores API failed, using user.store_id from token
+    if (!selectedStore && currentUser?.store_id) {
+      let userStore = stores.find((s: Store) => String(s.id) === String(currentUser.store_id));
+      
+      // If store not found in API response (e.g., API failed or user lacks permission),
+      // create a minimal store object from the token data
+      if (!userStore) {
+        userStore = {
+          id: currentUser.store_id,
+          name: 'Minha Loja',
+          address: null,
+          address_id: null,
+          phone: null,
+          city: null,
+          state: null,
+          cnpj: null,
+          email: null,
+          is_active: true,
+          created_at: '',
+          updated_at: '',
+        } as Store;
+      }
+      
+      setSelectedStoreState(userStore);
+      localStorage.setItem('@MadriNoivas:selectedStoreId', String(userStore.id));
     }
   };
 
@@ -74,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const parsedUser = JSON.parse(storagedUser);
           api.defaults.headers.common['Authorization'] = `Bearer ${storagedToken}`;
           setUser(parsedUser);
-          await loadStores();
+          await loadStores(parsedUser);
         } catch (error) {
           console.error("Erro ao ler dados do storage", error);
           signOut();
@@ -100,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         style: { borderRadius: '10px', background: '#333', color: '#fff' }
       });
       console.log("🔐 Contexto: Login realizado com sucesso para role:", userData.role);
-      await loadStores();
+      await loadStores(userData);
     } finally {
       setLoading(false);
     }

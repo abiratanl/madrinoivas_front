@@ -23,16 +23,12 @@ export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferM
     try {
       const data = await storeService.getAll();
       const storeList = Array.isArray(data) ? data : data.data || [];
-      // Filter out the current store of the product
-      const filteredStores = storeList.filter(
-        (store: Store) => String(store.id) !== String(product?.store_id)
-      );
-      setStores(filteredStores);
+      setStores(storeList);
     } catch (err) {
       console.error("Erro ao carregar lojas:", err);
       setError("Não foi possível carregar a lista de lojas.");
     }
-  }, [product]);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -153,16 +149,18 @@ export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferM
               )}
             >
               <option value="">Selecione a loja de destino...</option>
-              {stores.length === 0 ? (
+              {stores.filter((s) => String(s.id) !== String(product?.store_id)).length === 0 ? (
                 <option value="" disabled>
                   Nenhuma outra loja disponível
                 </option>
               ) : (
-                stores.map((store) => (
-                  <option key={store.id} value={String(store.id)}>
-                    {store.name}
-                  </option>
-                ))
+                stores
+                  .filter((s) => String(s.id) !== String(product?.store_id))
+                  .map((store) => (
+                    <option key={store.id} value={String(store.id)}>
+                      {store.name}
+                    </option>
+                  ))
               )}
             </select>
             {error && (
