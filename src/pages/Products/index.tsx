@@ -3,14 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { productService, type Product, type ProductTransfer, type ProductWithTransfer } from "../../services/productService";
 import { categoryService, type Category } from "../../services/categoryService";
 import { useAuth } from "../../contexts/AuthContext";
-import { Edit2, Trash2, ArrowRightLeft, Package, Truck, CheckCircle, RotateCcw, AlertTriangle, Search, Wrench } from "lucide-react";
+import { Edit2, Trash2, ArrowRightLeft, Package, Truck, CheckCircle, RotateCcw, AlertTriangle, Search, Wrench, XCircle, Settings } from "lucide-react";
 import { TransferModal } from "../../components/products/TransferModal";
 import { ReceiveModal } from "../../components/products/ReceiveModal";
+import { EditTransferModal } from "../../components/products/EditTransferModal";
 import { ConfirmModal } from "../../components/common/ConfirmModal";
 import { toast } from "react-hot-toast";
 
 function Products() {
-  const { selectedStore } = useAuth();
+  const { selectedStore, user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -20,15 +21,25 @@ function Products() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  const isAttendant = user?.role?.toLowerCase() === 'attendant' || user?.role?.toLowerCase() === 'atendente';
+
   // Modal states
   const [transferProduct, setTransferProduct] = useState<Product | null>(null);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [receiveProduct, setReceiveProduct] = useState<ProductWithTransfer | null>(null);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  // Edit Transfer Modal
+  const [editTransfer, setEditTransfer] = useState<ProductTransfer | null>(null);
+  const [isEditTransferModalOpen, setIsEditTransferModalOpen] = useState(false);
+
   // Confirmation modals
-  const [confirmAction, setConfirmAction] = useState<"discard" | "makeAvailable" | "sendToMaintenance" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"discard" | "makeAvailable" | "sendToMaintenance" | "cancelTransfer" | null>(null);
   const [confirmProductId, setConfirmProductId] = useState<string | null>(null);
+  const [confirmTransferId, setConfirmTransferId] = useState<string | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
+  // Cache de permissões para editar transferência
+  const [editTransferPermissions, setEditTransferPermissions] = useState<Record<string, boolean>>({});
 
   const loadCategories = async () => {
     try {
@@ -101,6 +112,13 @@ function Products() {
     loadCategories();
   }, []);
 
+  // Forçar isGlobal = false para atendente
+  useEffect(() => {
+    if (isAttendant && isGlobal) {
+      setIsGlobal(false);
+    }
+  }, [isAttendant, isGlobal]);
+
   // Recarregar produtos se mudar o filtro ou o checkbox global
   useEffect(() => {
     loadProducts();
@@ -148,21 +166,31 @@ function Products() {
         successMessage = "Produto enviado para manutenção!";
         errorMessage = "Erro ao enviar produto para manutenção.";
         break;
+      case "cancelTransfer":
+        newStatus = "available";
+        successMessage = "Transferência cancelada! Produto disponível novamente.";
+        errorMessage = "Erro ao cancelar transferência.";
+        break;
       default:
         return;
     }
 
     try {
-      const formData = new FormData();
-      formData.append("status", newStatus);
-      await productService.update(id, formData);
-      setProducts(products.map((p) => (p.id === id ? { ...p, status: newStatus } : p)));
+      if (confirmAction === "cancelTransfer") {
+        await productService.cancelTransfer(confirmTransferId || id);
+      } else {
+        const formData = new FormData();
+        formData.append("status", newStatus);
+        await productService.update(id, formData);
+      }
+      setProducts(products.map((p) => (p.id === id ? { ...p, status: "available" } : p)));
       toast.success(successMessage, { style: { borderRadius: "10px", background: "#333", color: "#fff" } });
     } catch {
       toast.error(errorMessage, { style: { borderRadius: "10px", background: "#333", color: "#fff" } });
     } finally {
       setConfirmAction(null);
       setConfirmProductId(null);
+      setConfirmTransferId(null);
       setIsConfirmModalOpen(false);
     }
   }
@@ -220,7 +248,12 @@ function Products() {
         if (anyActiveTransfer) {
           console.warn("Transferência encontrada mas para outra loja:", anyActiveTransfer.to_store_id);
           // Usa a transferência encontrada mesmo sendo para outra loja
-          setReceiveProduct({ ...product, transfer_id: anyActiveTransfer.id });
+          setReceiveProduct({ 
+            ...product, 
+            transfer_id: anyActiveTransfer.id,
+            from_store: anyActiveTransfer.from_store,
+            to_store: anyActiveTransfer.to_store
+          });
           setIsReceiveModalOpen(true);
           return;
         }
@@ -231,10 +264,133 @@ function Products() {
         return;
       }
       
-      setReceiveProduct({ ...product, transfer_id: activeTransfer.id });
+      setReceiveProduct({ 
+        ...product, 
+        transfer_id: activeTransfer.id,
+        from_store: activeTransfer.from_store,
+        to_store: activeTransfer.to_store
+      });
       setIsReceiveModalOpen(true);
     } catch (error) {
       console.error("Erro ao buscar transferência:", error);
+      toast.error("Erro ao carregar informações da transferência.", {
+        style: { borderRadius: "10px", background: "#333", color: "#fff" },
+      });
+    }
+  }
+
+  async function handleCancelTransfer(product: Product) {
+    if (product.status !== "transferring") {
+      toast.error("Este produto não está em transferência.", {
+        style: { borderRadius: "10px", background: "#333", color: "#fff" },
+      });
+      return;
+    }
+
+    // Buscar a transferência ativa para este produto (para obter o transfer_id e from_store_id)
+    try {
+      const transfers = await productService.getTransfers(product.id);
+      console.log("Transferências encontradas para cancelamento:", transfers);
+      
+      const activeTransfer = transfers.find(
+        (t: ProductTransfer) => t.status === "active"
+      );
+      
+      if (!activeTransfer) {
+        toast.error("Nenhuma transferência ativa encontrada para este produto.", {
+          style: { borderRadius: "10px", background: "#333", color: "#fff" },
+        });
+        return;
+      }
+
+      // Verificação de permissão no frontend (UX): admin/owner OU loja de origem
+      const userRole = user?.role?.toLowerCase();
+      const isAdminOrOwner = userRole === "admin" || userRole === "owner";
+      const isFromStore = selectedStore && String(selectedStore.id) === String(activeTransfer.from_store_id);
+
+      if (!isAdminOrOwner && !isFromStore) {
+        toast.error("Você não tem permissão para cancelar esta transferência.", {
+          style: { borderRadius: "10px", background: "#333", color: "#fff" },
+        });
+        return;
+      }
+
+      setConfirmAction("cancelTransfer");
+      setConfirmProductId(product.id);
+      setConfirmTransferId(activeTransfer.id);
+      setIsConfirmModalOpen(true);
+    } catch (error) {
+      console.error("Erro ao buscar transferência para cancelamento:", error);
+      toast.error("Erro ao carregar informações da transferência.", {
+        style: { borderRadius: "10px", background: "#333", color: "#fff" },
+      });
+    }
+  }
+
+  // Verificar permissão de editar transferência (usa cache)
+  const canEditTransfer = (productId: string): boolean => {
+    return editTransferPermissions[productId] === true;
+  };
+
+  // Carregar permissão de editar transferência para um produto
+  const loadEditTransferPermission = useCallback(async (product: Product) => {
+    if (product.status !== "transferring") return;
+    if (product.id in editTransferPermissions) return;
+
+    try {
+      const transfers = await productService.getTransfers(product.id);
+      const activeTransfer = transfers.find((t: ProductTransfer) => t.status === "active");
+      if (!activeTransfer) {
+        setEditTransferPermissions((prev) => ({ ...prev, [product.id]: false } as Record<string, boolean>));
+        return;
+      }
+
+      const userRole = user?.role?.toLowerCase();
+      const isAdminOrOwner = userRole === "admin" || userRole === "owner";
+      const isFromStore = selectedStore && String(selectedStore.id) === String(activeTransfer.from_store_id);
+
+      setEditTransferPermissions((prev) => ({ ...prev, [product.id]: isAdminOrOwner || isFromStore } as Record<string, boolean>));
+    } catch (error) {
+      console.error("Erro ao verificar permissão de edição de transferência:", error);
+      setEditTransferPermissions((prev) => ({ ...prev, [product.id]: false } as Record<string, boolean>));
+    }
+  }, [user?.role, selectedStore?.id, editTransferPermissions]);
+
+  // Carregar permissões quando produtos mudam
+  useEffect(() => {
+    products.forEach((product) => {
+      if (product.status === "transferring") {
+        loadEditTransferPermission(product);
+      }
+    });
+  }, [products, loadEditTransferPermission]);
+
+  async function handleEditTransfer(product: Product) {
+    if (product.status !== "transferring") return;
+
+    // Verificar cache primeiro
+    if (!editTransferPermissions[product.id]) {
+      toast.error("Você não tem permissão para editar esta transferência.", {
+        style: { borderRadius: "10px", background: "#333", color: "#fff" },
+      });
+      return;
+    }
+
+    try {
+      const transfers = await productService.getTransfers(product.id);
+      const activeTransfer = transfers.find((t: ProductTransfer) => t.status === "active");
+      
+      if (!activeTransfer) {
+        toast.error("Nenhuma transferência ativa encontrada.", {
+          style: { borderRadius: "10px", background: "#333", color: "#fff" },
+        });
+        return;
+      }
+
+      setEditTransfer(activeTransfer);
+      setIsEditTransferModalOpen(true);
+    } catch (error) {
+      console.error("Erro ao buscar transferência para edição:", error);
       toast.error("Erro ao carregar informações da transferência.", {
         style: { borderRadius: "10px", background: "#333", color: "#fff" },
       });
@@ -251,6 +407,12 @@ function Products() {
     loadProducts();
     setReceiveProduct(null);
     setIsReceiveModalOpen(false);
+  }
+
+  function handleEditTransferSuccess() {
+    loadProducts();
+    setEditTransfer(null);
+    setIsEditTransferModalOpen(false);
   }
 
   // Helper para exibir imagem (Capa do Join ou Array de Imagens)
@@ -344,18 +506,20 @@ function Products() {
             <option value="discarded">Descartado</option>
           </select>
 
-          {/* Checkbox Busca Global */}
-          <label className="flex items-center gap-2 cursor-pointer bg-white hover:bg-gray-50 px-3 py-2 rounded border border-gray-300 shadow-sm transition-colors">
-            <input
-              type="checkbox"
-              checked={isGlobal}
-              onChange={(e) => setIsGlobal(e.target.checked)}
-              className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500 border-gray-300"
-            />
-            <span className="text-sm font-medium text-gray-700">
-              Ver Todas as Lojas
-            </span>
-          </label>
+          {/* Checkbox Busca Global - oculto para atendente */}
+          {!isAttendant && (
+            <label className="flex items-center gap-2 cursor-pointer bg-white hover:bg-gray-50 px-3 py-2 rounded border border-gray-300 shadow-sm transition-colors">
+              <input
+                type="checkbox"
+                checked={isGlobal}
+                onChange={(e) => setIsGlobal(e.target.checked)}
+                className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500 border-gray-300"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Ver Todas as Lojas
+              </span>
+            </label>
+          )}
 
           {/* Botão Novo - por último */}
           <Link
@@ -436,13 +600,27 @@ function Products() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1.5">
-                      <button
-                        onClick={() => navigate(`/products/edit/${product.id}`)}
-                        className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
-                        title="Editar"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                      {/* Editar - não exibir para produtos em transferência */}
+                      {product.status !== "transferring" && (
+                        <button
+                          onClick={() => navigate(`/products/edit/${product.id}`)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
+                          title="Editar"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {/* Editar Transferência - para transferring (admin, owner, loja origem) */}
+                      {product.status === "transferring" && canEditTransfer(product.id) && (
+                        <button
+                          onClick={() => handleEditTransfer(product)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all active:scale-90"
+                          title="Editar Transferência"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                      )}
 
                       {/* Transferir - para available, reserved, maintenance */}
                       {["available", "reserved", "maintenance"].includes(product.status) && (
@@ -463,6 +641,17 @@ function Products() {
                           title="Receber Produto"
                         >
                           <Package className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {/* Cancelar Transferência - para transferring */}
+                      {product.status === "transferring" && (
+                        <button
+                          onClick={() => handleCancelTransfer(product)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all active:scale-90"
+                          title="Cancelar Transferência"
+                        >
+                          <XCircle className="w-4 h-4" />
                         </button>
                       )}
 
@@ -508,7 +697,7 @@ function Products() {
           {!loading && products.length === 0 && (
             <div className="p-10 text-center text-gray-500 bg-white">
               <p>Nenhum produto encontrado com os filtros atuais.</p>
-              {isGlobal === false && (
+              {!isAttendant && isGlobal === false && (
                 <p className="text-xs mt-2 text-gray-400">
                   Tente marcar "Ver Todas as Lojas".
                 </p>
@@ -540,6 +729,17 @@ function Products() {
         onSuccess={handleReceiveSuccess}
       />
 
+      {/* Edit Transfer Modal */}
+      <EditTransferModal
+        isOpen={isEditTransferModalOpen}
+        onClose={() => {
+          setIsEditTransferModalOpen(false);
+          setEditTransfer(null);
+        }}
+        transfer={editTransfer}
+        onSuccess={handleEditTransferSuccess}
+      />
+
       {/* Confirmation Modal */}
       <ConfirmModal
         isOpen={isConfirmModalOpen}
@@ -547,6 +747,7 @@ function Products() {
           setIsConfirmModalOpen(false);
           setConfirmAction(null);
           setConfirmProductId(null);
+          setConfirmTransferId(null);
         }}
         onConfirm={executeConfirmAction}
         title={
@@ -554,6 +755,8 @@ function Products() {
             ? "Confirmar Descarte"
             : confirmAction === "makeAvailable"
             ? "Tornar Disponível"
+            : confirmAction === "cancelTransfer"
+            ? "Cancelar Transferência"
             : "Enviar para Manutenção"
         }
         description={
@@ -561,9 +764,11 @@ function Products() {
             ? "O produto será marcado como descartado e não aparecerá mais nas listagens normais."
             : confirmAction === "makeAvailable"
             ? "O produto voltará a ficar disponível para aluguel e transferência."
+            : confirmAction === "cancelTransfer"
+            ? "Deseja realmente cancelar a transferência deste produto? O status do produto voltará para 'Disponível' e a transferência será marcada como cancelada."
             : "O produto será marcado como em manutenção e não ficará disponível para aluguel até que retorne."
         }
-        confirmText={confirmAction === "discard" ? "Descartar" : confirmAction === "makeAvailable" ? "Confirmar" : "Enviar"}
+        confirmText={confirmAction === "discard" ? "Descartar" : confirmAction === "makeAvailable" ? "Confirmar" : confirmAction === "cancelTransfer" ? "Cancelar Transferência" : "Enviar"}
         variant={confirmAction === "discard" ? "danger" : "warning"}
       />
     </div>

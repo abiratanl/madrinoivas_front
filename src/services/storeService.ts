@@ -58,6 +58,16 @@ export const storeService = {
     const response = await api.get('/stores', { params: { showInactive } });
     return response.data;
   },
+
+  /**
+   * GET /stores/for-transfer
+   * Retrieves stores available for transfer (excludes user's own store).
+   * Accessible by attendants.
+   */
+  getForTransfer: async () => {
+    const response = await api.get('/stores/for-transfer');
+    return response.data;
+  },
    
   /**
    * GET /stores/:id

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { X, Truck, Store as StoreIcon, AlertCircle, CheckCircle } from "lucide-react";
 import { storeService, type Store } from "../../services/storeService";
 import { productService, type Product, type TransferProductDTO } from "../../services/productService";
+import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../utils/cn";
 import { toast } from "react-hot-toast";
 
@@ -13,6 +14,7 @@ interface TransferModalProps {
 }
 
 export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferModalProps) {
+  const { user } = useAuth();
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
@@ -21,14 +23,16 @@ export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferM
 
   const loadStores = useCallback(async () => {
     try {
-      const data = await storeService.getAll();
+      // Attendants use /for-transfer endpoint, admins/owners use /stores
+      const isAttendant = user?.role?.toLowerCase() === 'attendant' || user?.role?.toLowerCase() === 'atendente';
+      const data = isAttendant ? await storeService.getForTransfer() : await storeService.getAll();
       const storeList = Array.isArray(data) ? data : data.data || [];
       setStores(storeList);
     } catch (err) {
       console.error("Erro ao carregar lojas:", err);
       setError("Não foi possível carregar a lista de lojas.");
     }
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => {
     if (isOpen) {
@@ -75,7 +79,26 @@ export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferM
 
   if (!isOpen || !product) return null;
 
+  // Ensure origin store is in the list (it's excluded from /for-transfer for attendants)
   const currentStore = stores.find((s) => String(s.id) === String(product.store_id));
+  
+  // If origin store not in list (attendant case), add it for display purposes
+  const originStore: Store = {
+    id: String(product.store_id),
+    name: product.store_name || "Minha Loja",
+    address: null,
+    address_id: null,
+    phone: null,
+    city: null,
+    state: null,
+    cnpj: null,
+    email: null,
+    is_active: true,
+    created_at: "",
+    updated_at: "",
+  };
+  
+  const displayStores = currentStore ? stores : [...stores, originStore];
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -126,7 +149,7 @@ export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferM
             </label>
             <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
               <StoreIcon className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-700 font-medium">{currentStore?.name || "Carregando..."}</span>
+              <span className="text-gray-700 font-medium">{currentStore?.name || product.store_name || "Minha Loja"}</span>
               <span className="ml-auto px-2 py-0.5 text-xs bg-gray-200 text-gray-600 rounded">Origem</span>
             </div>
           </div>
@@ -198,7 +221,7 @@ export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferM
               <div>
                 <p className="text-sm font-medium text-green-800">Pronto para transferir</p>
                 <p className="text-xs text-green-700">
-                  O produto será movido para <strong>{stores.find((s) => String(s.id) === selectedStoreId)?.name}</strong>
+                  O produto será movido para <strong>{displayStores.find((s) => String(s.id) === selectedStoreId)?.name}</strong>
                   e ficará com status "Em Transferência" até o recebimento.
                 </p>
               </div>

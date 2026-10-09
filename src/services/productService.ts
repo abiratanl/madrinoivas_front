@@ -33,6 +33,8 @@ export interface ProductTransfer {
   to_store_id: string;
   requested_by: string;
   received_by: string | null;
+  cancelled_by: string | null;
+  cancelled_at: string | null;
   status: "active" | "completed" | "cancelled";
   notes: string | null;
   requested_at: string;
@@ -42,10 +44,13 @@ export interface ProductTransfer {
   to_store?: { id: string; name: string };
   requested_by_name?: string;
   received_by_name?: string;
+  cancelled_by_name?: string;
 }
 
 export interface ProductWithTransfer extends Product {
   transfer_id: string;
+  from_store?: { id: string; name: string };
+  to_store?: { id: string; name: string };
 }
 
 export interface TransferProductDTO {
@@ -139,7 +144,19 @@ export const productService = {
     return response.data;
   },
 
-  // 8. LISTAR TRANSFERÊNCIAS (Opcional - para histórico)
+  // 8. CANCELAR TRANSFERÊNCIA DE PRODUTO
+  cancelTransfer: async (transferId: number | string) => {
+    const response = await api.patch(`/transfers/${transferId}/cancel`);
+    return response.data;
+  },
+
+  // 9. ATUALIZAR TRANSFERÊNCIA (Editar loja de destino / observações)
+  updateTransfer: async (transferId: number | string, data: { to_store_id?: string; notes?: string }) => {
+    const response = await api.put(`/transfers/${transferId}`, data);
+    return response.data;
+  },
+
+  // 10. LISTAR TRANSFERÊNCIAS (Opcional - para histórico)
   getTransfers: async (productId?: number | string) => {
     const url = productId ? `/products/${productId}/transfers` : "/transfers";
     const response = await api.get(url);
@@ -151,7 +168,7 @@ export const productService = {
     }));
   },
 
-  // 9. LISTAR PRODUTOS EM TRANSFERÊNCIA PARA UMA LOJA ESPECÍFICA
+  // 10. LISTAR PRODUTOS EM TRANSFERÊNCIA PARA UMA LOJA ESPECÍFICA
   getTransferringToStore: async (storeId: string | number): Promise<ProductWithTransfer[]> => {
     console.log("[productService.getTransferringToStore] Buscando para storeId:", storeId);
     // Try with query parameters first (if backend supports it)

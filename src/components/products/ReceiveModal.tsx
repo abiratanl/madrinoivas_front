@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { X, CheckCircle, Package, AlertCircle } from "lucide-react";
-import { productService, type Product, type ReceiveProductDTO } from "../../services/productService";
+import { X, CheckCircle, Package, AlertCircle, Store as StoreIcon } from "lucide-react";
+import { productService, type Product, type ReceiveProductDTO, type ProductTransfer } from "../../services/productService";
 import { cn } from "../../utils/cn";
 import { toast } from "react-hot-toast";
 
 interface ProductWithTransfer extends Product {
   transfer_id?: string;
+  from_store?: { id: string; name: string };
+  to_store?: { id: string; name: string };
 }
 
 interface ReceiveModalProps {
@@ -32,7 +34,9 @@ export function ReceiveModal({ isOpen, onClose, product, onSuccess }: ReceiveMod
       };
 
       await productService.receive(product.id, receiveData);
-      toast.success("Produto recebido com sucesso!", {
+      const fromStore = product.from_store?.name || product.store_name || "Loja de Origem";
+      const toStore = product.to_store?.name || "Loja de Destino";
+      toast.success(`Produto recebido com sucesso! Transferido de "${fromStore}" para "${toStore}".`, {
         style: { borderRadius: "10px", background: "#333", color: "#fff" },
       });
       onSuccess();
@@ -107,6 +111,23 @@ export function ReceiveModal({ isOpen, onClose, product, onSuccess }: ReceiveMod
               </p>
             </div>
           </div>
+
+          {/* Transfer Details */}
+          {(product.from_store || product.to_store) && (
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Detalhes da Transferência</p>
+              <div className="flex items-center gap-2 text-sm">
+                <StoreIcon className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-600">Origem:</span>
+                <span className="font-medium text-gray-900">{product.from_store?.name || product.store_name || "Loja de Origem"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <StoreIcon className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-600">Destino:</span>
+                <span className="font-medium text-gray-900">{product.to_store?.name || "Loja de Destino"}</span>
+              </div>
+            </div>
+          )}
 
           {error && (
             <p className="mb-4 text-sm text-red-600 flex items-center gap-1">
