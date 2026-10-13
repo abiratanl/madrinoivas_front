@@ -82,6 +82,8 @@ interface ProductFormModalProps {
     store_id: string;
     is_featured: boolean;
     photos: File[];
+    existingPhotoIds: string[];
+    existingPhotoPreviews: string[];
   };
   setFormData: (data: any) => void;
   categories: Category[];
@@ -103,7 +105,10 @@ export function ProductFormModal({
 }: ProductFormModalProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingPhotoIds, setExistingPhotoIds] = useState<string[]>([]);
+  const [existingPreviews, setExistingPreviews] = useState<string[]>([]);
   const [showCamera, setShowCamera] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -111,20 +116,25 @@ export function ProductFormModal({
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, 
+        video: { facingMode: { ideal: 'environment' } }, 
         audio: false 
       });
       setCameraStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
       setShowCamera(true);
     } catch (error) {
       console.error('Erro ao acessar câmera:', error);
       alert('Não foi possível acessar a câmera. Verifique as permissões.');
     }
   };
+
+  useEffect(() => {
+    if (cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current?.play().catch(console.error);
+      };
+    }
+  }, [cameraStream]);
 
   const stopCamera = () => {
     if (cameraStream) {
@@ -146,46 +156,97 @@ export function ProductFormModal({
       ctx.drawImage(video, 0, 0);
       canvas.toBlob((blob) => {
         if (blob) {
-          const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-          const newFiles = [...selectedFiles, file];
-          setSelectedFiles(newFiles);
-          const preview = URL.createObjectURL(file);
-          setImagePreviews(prev => [...prev, preview]);
-          setFormData({ ...formData, photos: newFiles });
+          const preview = URL.createObjectURL(blob);
+          setCapturedPhoto(preview);
         }
       }, 'image/jpeg', 0.9);
     }
-    stopCamera();
+    // Don't stop camera here - keep showCamera true for preview
   };
+
+  const confirmCapture = () => {
+    if (!capturedPhoto) return;
+    
+    // Convert blob URL back to File
+    fetch(capturedPhoto)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        const newFiles = [...selectedFiles, file];
+        setSelectedFiles(newFiles);
+        setImagePreviews(prev => [...prev, capturedPhoto]);
+        setFormData({ ...formData, photos: newFiles });
+        setCapturedPhoto(null);
+        stopCamera();
+      });
+  };
+
+  const discardCapture = () => {
+    if (capturedPhoto) {
+      URL.revokeObjectURL(capturedPhoto);
+      setCapturedPhoto(null);
+    }
+    // Restart camera for another attempt
+    startCamera();
+  };
+
+  const [initialPhotosLoaded, setInitialPhotosLoaded] = useState(false);
 
   useEffect(() => {
     if (!isOpen) setCurrentStep(1);
   }, [isOpen, setCurrentStep]);
 
   useEffect(() => {
-    if (formData.photos && formData.photos.length > 0) {
+    if (formData.photos && formData.photos.length > 0 && !initialPhotosLoaded) {
       setSelectedFiles(formData.photos);
       const previews = formData.photos.map((file: File) => URL.createObjectURL(file));
       setImagePreviews(previews);
+      setInitialPhotosLoaded(true);
     }
-  }, [formData.photos]);
+  }, [formData.photos, initialPhotosLoaded]);
+
+  // Load existing photo IDs and previews from backend (for editing)
+  useEffect(() => {
+    if (isEditing && formData.existingPhotoIds && formData.existingPhotoIds.length > 0) {
+      setExistingPhotoIds(formData.existingPhotoIds);
+      setExistingPreviews(formData.existingPhotoPreviews || []);
+    }
+  }, [isEditing, formData.existingPhotoIds, formData.existingPhotoPreviews]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files);
-      setSelectedFiles(files);
-      const previews = files.map(file => URL.createObjectURL(file));
-      setImagePreviews(previews);
-      setFormData({ ...formData, photos: files });
+      const newFiles = Array.from(e.target.files);
+      const combinedFiles = [...selectedFiles, ...newFiles];
+      setSelectedFiles(combinedFiles);
+      const previews = newFiles.map(file => URL.createObjectURL(file));
+      setImagePreviews(prev => [...prev, ...previews]);
+      setFormData({ ...formData, photos: combinedFiles });
     }
   };
 
   const removeImage = (index: number) => {
-    const newFiles = selectedFiles.filter((_, i) => i !== index);
-    const newPreviews = imagePreviews.filter((_, i) => i !== index);
-    setSelectedFiles(newFiles);
-    setImagePreviews(newPreviews);
-    setFormData({ ...formData, photos: newFiles });
+    const totalExisting = existingPreviews.length;
+    
+    if (index < totalExisting) {
+      // Removing an existing photo from backend
+      const newExistingIds = existingPhotoIds.filter((_, i) => i !== index);
+      const newExistingPreviews = existingPreviews.filter((_, i) => i !== index);
+      setExistingPhotoIds(newExistingIds);
+      setExistingPreviews(newExistingPreviews);
+      setFormData({ 
+        ...formData, 
+        existingPhotoIds: newExistingIds,
+        existingPhotoPreviews: newExistingPreviews,
+      });
+    } else {
+      // Removing a new uploaded photo
+      const newFileIndex = index - totalExisting;
+      const newFiles = selectedFiles.filter((_, i) => i !== newFileIndex);
+      const newPreviews = imagePreviews.filter((_, i) => i !== newFileIndex);
+      setSelectedFiles(newFiles);
+      setImagePreviews(newPreviews);
+      setFormData({ ...formData, photos: newFiles });
+    }
   };
 
   const handleClose = () => {
@@ -443,32 +504,61 @@ export function ProductFormModal({
                 {/* Camera Capture */}
                 {showCamera && (
                   <div className="mb-4">
-                    <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent flex justify-center gap-4">
-                        <button
-                          type="button"
-                          onClick={stopCamera}
-                          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
-                        >
-                          <X className="w-4 h-4" />
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={capturePhoto}
-                          className="px-6 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors flex items-center gap-2"
-                        >
-                          <Camera className="w-4 h-4" />
-                          Capturar
-                        </button>
+                    {capturedPhoto ? (
+                      <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                        <img
+                          src={capturedPhoto}
+                          alt="Captured photo"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent flex justify-center gap-4">
+                          <button
+                            type="button"
+                            onClick={discardCapture}
+                            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+                          >
+                            <X className="w-4 h-4" />
+                            Descartar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={confirmCapture}
+                            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                          >
+                            <Check className="w-4 h-4" />
+                            Usar Foto
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent flex justify-center gap-4">
+                          <button
+                            type="button"
+                            onClick={stopCamera}
+                            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+                          >
+                            <X className="w-4 h-4" />
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={capturePhoto}
+                            className="px-6 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors flex items-center gap-2"
+                          >
+                            <Camera className="w-4 h-4" />
+                            Capturar
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -502,13 +592,16 @@ export function ProductFormModal({
                   </div>
                 )}
 
-                {selectedFiles.length > 0 && (
+                {selectedFiles.length > 0 || existingPreviews.length > 0 && (
                   <div className="mt-4">
-                    <p className="text-sm text-gray-600 mb-2">{selectedFiles.length} arquivo(s) selecionado(s)</p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {existingPreviews.length + selectedFiles.length} foto(s) total
+                    </p>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                      {imagePreviews.map((preview, index) => (
-                        <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                          <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                      {/* Existing photos from backend */}
+                      {existingPreviews.map((preview, index) => (
+                        <div key={`existing-${index}`} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                          <img src={preview} alt={`Existing ${index + 1}`} className="w-full h-full object-cover" />
                           <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               type="button"
@@ -518,7 +611,25 @@ export function ProductFormModal({
                               <X className="w-4 h-4" />
                             </button>
                           </div>
-                          {index === 0 && (
+                          {index === 0 && selectedFiles.length === 0 && (
+                            <span className="absolute top-1 left-1 bg-rose-600 text-white text-xs px-1.5 py-0.5 rounded">Capa</span>
+                          )}
+                        </div>
+                      ))}
+                      {/* New uploaded photos */}
+                      {imagePreviews.map((preview, index) => (
+                        <div key={`new-${index}`} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                          <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={() => removeImage(existingPreviews.length + index)}
+                              className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          {index === 0 && existingPreviews.length === 0 && (
                             <span className="absolute top-1 left-1 bg-rose-600 text-white text-xs px-1.5 py-0.5 rounded">Capa</span>
                           )}
                         </div>

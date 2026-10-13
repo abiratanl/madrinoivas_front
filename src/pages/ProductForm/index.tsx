@@ -21,7 +21,7 @@ function ProductForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(true);
 
-  const [formData, setFormData] = useState({
+const [formData, setFormData] = useState({
     code: '',
     name: '',
     description: '',
@@ -35,6 +35,8 @@ function ProductForm() {
     store_id: '',
     is_featured: false,
     photos: [] as File[],
+    existingPhotoIds: [] as string[],
+    existingPhotoPreviews: [] as string[],
   });
 
   const checkUserRole = useCallback(() => {
@@ -76,6 +78,10 @@ function ProductForm() {
       const res: any = await productService.getById(prodId);
       const p = res.data || res;
 
+      const existingImages = p.images || [];
+      const existingIds = existingImages.map((img: any) => img.id).filter(Boolean);
+      const existingPreviews = existingImages.map((img: any) => img.url_thumb || img.url_full).filter(Boolean);
+
       setFormData({
         code: p.code || '',
         name: p.name || '',
@@ -90,6 +96,8 @@ function ProductForm() {
         store_id: p.store_id ? String(p.store_id) : '',
         is_featured: !!p.is_featured,
         photos: [],
+        existingPhotoIds: existingIds,
+        existingPhotoPreviews: existingPreviews,
       });
 
       if (isAdmin) {
@@ -168,13 +176,18 @@ function ProductForm() {
       const data = new FormData();
 
       Object.entries(formData).forEach(([key, value]) => {
-        if (key === 'photos') return;
+        if (key === 'photos' || key === 'existingPhotoIds') return;
         if (typeof value === 'boolean') {
           data.append(key, value ? '1' : '0');
         } else {
           data.append(key, String(value));
         }
       });
+
+      // Send existing photo IDs for update (so backend knows what to keep)
+      if (id && formData.existingPhotoIds && formData.existingPhotoIds.length > 0) {
+        data.append('existing_photo_ids', JSON.stringify(formData.existingPhotoIds));
+      }
 
       if (formData.photos && formData.photos.length > 0) {
         formData.photos.forEach((file: File) => {
