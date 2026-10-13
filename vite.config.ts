@@ -56,14 +56,26 @@ export default defineConfig({
     },
   },
 
-  server: {
-    host: true, // Mantido para Docker
+      server: {
+    host: true, 
     port: 5173,
+    allowedHosts: ['onion-proclaim-granola.ngrok-free.dev', 'localhost', '.ngrok-free.dev'],
+    // CONFIGURAÇÃO DO PROXY AJUSTADA:
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:3000', // Aponta para a raiz do seu backend
+        changeOrigin: true,
+        secure: false,
+        // NÃO COLOQUE A LINHA REWRITE AQUI. 
+        // O Vite vai transformar "/api/login" em "http://127.0.0" automaticamente.
+      }
+    },
     watch: {
-      // Mantido para Windows/Docker
       usePolling: true, 
     },
   },
+
+
 
   test: {
     globals: true,
