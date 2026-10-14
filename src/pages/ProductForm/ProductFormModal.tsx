@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, ChevronLeft, Image, Tag, DollarSign, Package, Store as StoreIcon, ArrowLeft, ArrowRight, Camera, Upload } from 'lucide-react';
+import { X, Check, ChevronLeft, Image, Tag, DollarSign, Package, Store as StoreIcon, ArrowLeft, ArrowRight, Camera, Upload, Star } from 'lucide-react';
 import { NumericFormat } from 'react-number-format';
 import { cn } from '../../utils/cn';
 import type { Category } from '../../services/categoryService';
@@ -84,6 +84,7 @@ interface ProductFormModalProps {
     photos: File[];
     existingPhotoIds: string[];
     existingPhotoPreviews: string[];
+    mainPhotoIndex: number;
   };
   setFormData: (data: any) => void;
   categories: Category[];
@@ -107,9 +108,17 @@ export function ProductFormModal({
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingPhotoIds, setExistingPhotoIds] = useState<string[]>([]);
   const [existingPreviews, setExistingPreviews] = useState<string[]>([]);
+  const [mainImageIndex, setMainImageIndex] = useState<number>(formData.mainPhotoIndex || 0);
+
+  useEffect(() => {
+    setMainImageIndex(formData.mainPhotoIndex || 0);
+  }, [formData.mainPhotoIndex]);
+
   const [showCamera, setShowCamera] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [filePreview, setFilePreview] = useState<{ files: File[]; previews: string[] } | null>(null);
+  const [filePreviewMainIndex, setFilePreviewMainIndex] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -216,12 +225,35 @@ export function ProductFormModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
-      const combinedFiles = [...selectedFiles, ...newFiles];
-      setSelectedFiles(combinedFiles);
       const previews = newFiles.map(file => URL.createObjectURL(file));
-      setImagePreviews(prev => [...prev, ...previews]);
-      setFormData({ ...formData, photos: combinedFiles });
+      setFilePreview({ files: newFiles, previews });
+      setFilePreviewMainIndex(0);
     }
+    // Reset input value to allow selecting same file again
+    if (e.target) e.target.value = '';
+  };
+
+  const confirmFilePreview = () => {
+    if (!filePreview) return;
+    const combinedFiles = [...selectedFiles, ...filePreview.files];
+    const combinedPreviews = [...imagePreviews, ...filePreview.previews];
+    setSelectedFiles(combinedFiles);
+    setImagePreviews(combinedPreviews);
+    setFormData({ ...formData, photos: combinedFiles });
+    setFilePreview(null);
+    setFilePreviewMainIndex(0);
+  };
+
+  const discardFilePreview = () => {
+    if (filePreview) {
+      filePreview.previews.forEach(url => URL.revokeObjectURL(url));
+    }
+    setFilePreview(null);
+    setFilePreviewMainIndex(0);
+  };
+
+  const setFilePreviewMain = (index: number) => {
+    setFilePreviewMainIndex(index);
   };
 
   const removeImage = (index: number) => {
@@ -238,6 +270,11 @@ export function ProductFormModal({
         existingPhotoIds: newExistingIds,
         existingPhotoPreviews: newExistingPreviews,
       });
+      
+      // Adjust main image index if needed
+      if (mainImageIndex >= index) {
+        setMainImageIndex(prev => prev > 0 ? prev - 1 : 0);
+      }
     } else {
       // Removing a new uploaded photo
       const newFileIndex = index - totalExisting;
@@ -246,7 +283,17 @@ export function ProductFormModal({
       setSelectedFiles(newFiles);
       setImagePreviews(newPreviews);
       setFormData({ ...formData, photos: newFiles });
+      
+      // Adjust main image index if needed
+      if (mainImageIndex >= index) {
+        setMainImageIndex(prev => prev > 0 ? prev - 1 : 0);
+      }
     }
+  };
+
+  const setMainImage = (index: number) => {
+    setMainImageIndex(index);
+    setFormData({ ...formData, mainPhotoIndex: index });
   };
 
   const handleClose = () => {
@@ -562,6 +609,62 @@ export function ProductFormModal({
                   </div>
                 )}
 
+                {/* File Preview - compact inline preview */}
+                {filePreview && (
+                  <div className="mb-4">
+                    <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                          <Image className="w-5 h-5" /> Pré-visualização
+                        </h4>
+                        <span className="text-xs text-gray-500">{filePreview.files.length} arquivo(s)</span>
+                      </div>
+                      <div className="relative bg-black rounded-lg overflow-hidden aspect-video max-w-md mx-auto">
+                        <img
+                          src={filePreview.previews[filePreviewMainIndex]}
+                          alt="File preview"
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Navigation for multiple files */}
+                        {filePreview.previews.length > 1 && (
+                          <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-2">
+                            {filePreview.previews.map((_, index) => (
+                              <button
+                                key={index}
+                                type="button"
+                                onClick={() => setFilePreviewMain(index)}
+                                className={`w-2 h-2 rounded-full transition-colors ${
+                                  index === filePreviewMainIndex
+                                    ? 'bg-white'
+                                    : 'bg-white/50 hover:bg-white/75'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent flex justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={discardFilePreview}
+                            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+                          >
+                            <X className="w-4 h-4" />
+                            Descartar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={confirmFilePreview}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                          >
+                            <Check className="w-4 h-4" />
+                            Usar Foto(s)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {!showCamera && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     {/* File Upload */}
@@ -592,48 +695,122 @@ export function ProductFormModal({
                   </div>
                 )}
 
-                {selectedFiles.length > 0 || existingPreviews.length > 0 && (
+                {(selectedFiles.length > 0 || existingPreviews.length > 0) && (
                   <div className="mt-4">
                     <p className="text-sm text-gray-600 mb-2">
                       {existingPreviews.length + selectedFiles.length} foto(s) total
                     </p>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                       {/* Existing photos from backend */}
-                      {existingPreviews.map((preview, index) => (
-                        <div key={`existing-${index}`} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                          <img src={preview} alt={`Existing ${index + 1}`} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                      {existingPreviews.map((preview, index) => {
+                        const globalIndex = index;
+                        const isMain = mainImageIndex === globalIndex;
+                        return (
+                          <div key={`existing-${index}`} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                            <img src={preview} alt={`Existing ${index + 1}`} className="w-full h-full object-cover" />
+                            {/* Mobile: always visible action bar at bottom */}
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 flex items-center justify-between md:hidden">
+                              {!isMain && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMainImage(globalIndex)}
+                                  className="bg-yellow-500 text-white p-2 rounded-full hover:bg-yellow-600 transition-colors"
+                                  title="Definir como capa"
+                                >
+                                  <Star className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeImage(globalIndex)}
+                                className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
+                                title="Excluir"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            {/* Desktop: center overlay on hover */}
+                            <div className="hidden md:absolute md:inset-0 md:bg-black/50 md:flex md:items-center md:justify-center md:opacity-0 md:group-hover:opacity-100 md:transition-opacity md:flex-col md:gap-2 md:p-2">
+                              {!isMain && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMainImage(globalIndex)}
+                                  className="bg-yellow-500 text-white p-2 rounded-full hover:bg-yellow-600 transition-colors"
+                                  title="Definir como capa"
+                                >
+                                  <Star className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeImage(globalIndex)}
+                                className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
+                                title="Excluir"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            {isMain && (
+                              <span className="absolute top-1 left-1 bg-rose-600 text-white text-xs px-1.5 py-0.5 rounded">Capa</span>
+                            )}
                           </div>
-                          {index === 0 && selectedFiles.length === 0 && (
-                            <span className="absolute top-1 left-1 bg-rose-600 text-white text-xs px-1.5 py-0.5 rounded">Capa</span>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                       {/* New uploaded photos */}
-                      {imagePreviews.map((preview, index) => (
-                        <div key={`new-${index}`} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                          <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => removeImage(existingPreviews.length + index)}
-                              className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                      {imagePreviews.map((preview, index) => {
+                        const globalIndex = existingPreviews.length + index;
+                        const isMain = mainImageIndex === globalIndex;
+                        return (
+                          <div key={`new-${index}`} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                            <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                            {/* Mobile: always visible action bar at bottom */}
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 flex items-center justify-between md:hidden">
+                              {!isMain && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMainImage(globalIndex)}
+                                  className="bg-yellow-500 text-white p-2 rounded-full hover:bg-yellow-600 transition-colors"
+                                  title="Definir como capa"
+                                >
+                                  <Star className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeImage(globalIndex)}
+                                className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
+                                title="Excluir"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            {/* Desktop: center overlay on hover */}
+                            <div className="hidden md:absolute md:inset-0 md:bg-black/50 md:flex md:items-center md:justify-center md:opacity-0 md:group-hover:opacity-100 md:transition-opacity md:flex-col md:gap-2 md:p-2">
+                              {!isMain && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMainImage(globalIndex)}
+                                  className="bg-yellow-500 text-white p-2 rounded-full hover:bg-yellow-600 transition-colors"
+                                  title="Definir como capa"
+                                >
+                                  <Star className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeImage(globalIndex)}
+                                className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
+                                title="Excluir"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            {isMain && (
+                              <span className="absolute top-1 left-1 bg-rose-600 text-white text-xs px-1.5 py-0.5 rounded">Capa</span>
+                            )}
                           </div>
-                          {index === 0 && existingPreviews.length === 0 && (
-                            <span className="absolute top-1 left-1 bg-rose-600 text-white text-xs px-1.5 py-0.5 rounded">Capa</span>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}

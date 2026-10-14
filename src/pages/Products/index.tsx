@@ -57,7 +57,7 @@ function Products() {
     let allProducts: Product[] = [];
 
     try {
-      // Busca os produtos da loja do atendente (já retorna array limpo do service)
+      // Busca os produtos da loja do atendente (already returns clean array from service)
       const result = await productService.getAll({
         categoryId: selectedCategory,
         globalSearch: isGlobal,
@@ -75,9 +75,7 @@ function Products() {
     // Se não é busca global e há uma loja selecionada, buscar também produtos em transferência PARA esta loja
     if (!isGlobal && selectedStore?.id) {
       try {
-        console.log("[Products] Buscando produtos em transferência para loja:", selectedStore.id);
         const transferringProducts = await productService.getTransferringToStore(selectedStore.id);
-        console.log("[Products] Produtos em transferência encontrados:", transferringProducts);
         
         // Filtrar por categoria se necessário
         let filteredTransferring = transferringProducts;
@@ -97,29 +95,27 @@ function Products() {
         const newProducts = filteredTransferring.filter((p) => !existingIds.has(p.id));
         allProducts = [...allProducts, ...newProducts];
       } catch (transferError) {
-        console.error("[Products] Erro ao buscar produtos em transferência:", transferError);
+        console.error("[Products] Error fetching transferring products:", transferError);
       }
     }
-
-    console.log("Produtos carregados:", allProducts); // Debug no console
-
+    
     setProducts(allProducts);
     setLoading(false);
   }, [selectedCategory, isGlobal, selectedStore?.id, selectedStatus]);
 
-  // Carregar categorias ao abrir a tela
+  // Load categories on screen open
   useEffect(() => {
     loadCategories();
   }, []);
 
-  // Forçar isGlobal = false para atendente
+  // Force isGlobal = false for attendant
   useEffect(() => {
     if (isAttendant && isGlobal) {
       setIsGlobal(false);
     }
   }, [isAttendant, isGlobal]);
 
-  // Recarregar produtos se mudar o filtro ou o checkbox global
+  // Reload products if filter or global checkbox changes
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
@@ -227,12 +223,9 @@ function Products() {
       return;
     }
     
-    // Buscar a transferência ativa para este produto
+    // Find active transfer for this product
     try {
       const transfers = await productService.getTransfers(product.id);
-      console.log("Transferências encontradas:", transfers);
-      console.log("Loja do usuário:", selectedStore?.id);
-      
       const userStoreId = String(selectedStore?.id);
       
       const activeTransfer = transfers.find(
@@ -240,14 +233,13 @@ function Products() {
       );
       
       if (!activeTransfer) {
-        // Fallback: se não encontrar para a loja específica, pega qualquer active
+        // Fallback: if not found for specific store, get any active
         const anyActiveTransfer = transfers.find(
           (t: ProductTransfer) => t.status === "active"
         );
         
         if (anyActiveTransfer) {
-          console.warn("Transferência encontrada mas para outra loja:", anyActiveTransfer.to_store_id);
-          // Usa a transferência encontrada mesmo sendo para outra loja
+          // Use transfer found even if for another store
           setReceiveProduct({ 
             ...product, 
             transfer_id: anyActiveTransfer.id,
@@ -287,10 +279,9 @@ function Products() {
       return;
     }
 
-    // Buscar a transferência ativa para este produto (para obter o transfer_id e from_store_id)
+// Find active transfer for this product (to get transfer_id and from_store_id)
     try {
       const transfers = await productService.getTransfers(product.id);
-      console.log("Transferências encontradas para cancelamento:", transfers);
       
       const activeTransfer = transfers.find(
         (t: ProductTransfer) => t.status === "active"
@@ -302,8 +293,8 @@ function Products() {
         });
         return;
       }
-
-      // Verificação de permissão no frontend (UX): admin/owner OU loja de origem
+      
+      // Frontend permission check (UX): admin/owner OR origin store
       const userRole = user?.role?.toLowerCase();
       const isAdminOrOwner = userRole === "admin" || userRole === "owner";
       const isFromStore = selectedStore && String(selectedStore.id) === String(activeTransfer.from_store_id);
@@ -327,12 +318,12 @@ function Products() {
     }
   }
 
-  // Verificar permissão de editar transferência (usa cache)
+  // Check transfer edit permission (uses cache)
   const canEditTransfer = (productId: string): boolean => {
     return editTransferPermissions[productId] === true;
   };
 
-  // Carregar permissão de editar transferência para um produto
+  // Load transfer edit permission for a product
   const loadEditTransferPermission = useCallback(async (product: Product) => {
     if (product.status !== "transferring") return;
     if (product.id in editTransferPermissions) return;
@@ -351,12 +342,12 @@ function Products() {
 
       setEditTransferPermissions((prev) => ({ ...prev, [product.id]: isAdminOrOwner || isFromStore } as Record<string, boolean>));
     } catch (error) {
-      console.error("Erro ao verificar permissão de edição de transferência:", error);
+      console.error("Error checking transfer edit permission:", error);
       setEditTransferPermissions((prev) => ({ ...prev, [product.id]: false } as Record<string, boolean>));
     }
   }, [user?.role, selectedStore?.id, editTransferPermissions]);
 
-  // Carregar permissões quando produtos mudam
+  // Load permissions when products change
   useEffect(() => {
     products.forEach((product) => {
       if (product.status === "transferring") {
@@ -368,7 +359,7 @@ function Products() {
   async function handleEditTransfer(product: Product) {
     if (product.status !== "transferring") return;
 
-    // Verificar cache primeiro
+    // Check cache first
     if (!editTransferPermissions[product.id]) {
       toast.error("Você não tem permissão para editar esta transferência.", {
         style: { borderRadius: "10px", background: "#333", color: "#fff" },
@@ -390,7 +381,7 @@ function Products() {
       setEditTransfer(activeTransfer);
       setIsEditTransferModalOpen(true);
     } catch (error) {
-      console.error("Erro ao buscar transferência para edição:", error);
+      console.error("Error fetching transfer for edit:", error);
       toast.error("Erro ao carregar informações da transferência.", {
         style: { borderRadius: "10px", background: "#333", color: "#fff" },
       });
@@ -415,17 +406,17 @@ function Products() {
     setIsEditTransferModalOpen(false);
   }
 
-  // Helper para exibir imagem (Capa do Join ou Array de Imagens)
+  // Helper to display image (Main from Join or Images Array)
   const getThumb = (product: Product) => {
-    // 1. Tenta pegar a URL direta (vinda do SQL otimizado)
+    // 1. Try direct URL (from optimized SQL)
     if (product.image_url) return product.image_url;
 
-    // 2. Tenta pegar do array de imagens (caso venha completo)
+    // 2. Try from images array (if full object)
     if (product.images && product.images.length > 0) {
       return product.images[0].url_thumb || product.images[0].url;
     }
 
-    // 3. Fallback se não tiver foto
+    // 3. Fallback if no photo
     return "https://placehold.co/50x50?text=S/Foto";
   };
 
@@ -611,7 +602,7 @@ function Products() {
                         </button>
                       )}
 
-                      {/* Editar Transferência - para transferring (admin, owner, loja origem) */}
+                      {/* Edit Transfer - for transferring (admin, owner, origin store) */}
                       {product.status === "transferring" && canEditTransfer(product.id) && (
                         <button
                           onClick={() => handleEditTransfer(product)}
@@ -622,7 +613,7 @@ function Products() {
                         </button>
                       )}
 
-                      {/* Transferir - para available, reserved, maintenance */}
+                      {/* Transfer - for available, reserved, maintenance */}
                       {["available", "reserved", "maintenance"].includes(product.status) && (
                         <button
                           onClick={() => handleOpenTransfer(product)}
@@ -633,7 +624,7 @@ function Products() {
                         </button>
                       )}
 
-                      {/* Receber - para transferring */}
+                      {/* Receive - for transferring */}
                       {product.status === "transferring" && (
                         <button
                           onClick={() => handleOpenReceive(product)}
@@ -644,7 +635,7 @@ function Products() {
                         </button>
                       )}
 
-                      {/* Cancelar Transferência - para transferring */}
+                      {/* Cancel Transfer - for transferring */}
                       {product.status === "transferring" && (
                         <button
                           onClick={() => handleCancelTransfer(product)}
@@ -655,7 +646,7 @@ function Products() {
                         </button>
                       )}
 
-                      {/* Enviar para Manutenção - para available, reserved */}
+                      {/* Send to Maintenance - for available, reserved */}
                       {["available", "reserved"].includes(product.status) && (
                         <button
                           onClick={() => handleSendToMaintenance(product.id)}

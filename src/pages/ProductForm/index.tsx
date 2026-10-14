@@ -37,6 +37,7 @@ const [formData, setFormData] = useState({
     photos: [] as File[],
     existingPhotoIds: [] as string[],
     existingPhotoPreviews: [] as string[],
+    mainPhotoIndex: 0,
   });
 
   const checkUserRole = useCallback(() => {
@@ -81,6 +82,8 @@ const [formData, setFormData] = useState({
       const existingImages = p.images || [];
       const existingIds = existingImages.map((img: any) => img.id).filter(Boolean);
       const existingPreviews = existingImages.map((img: any) => img.url_thumb || img.url_full).filter(Boolean);
+      // Find the main image index
+      const mainImageIndex = existingImages.findIndex((img: any) => img.is_main === 1 || img.is_main === true);
 
       setFormData({
         code: p.code || '',
@@ -98,6 +101,7 @@ const [formData, setFormData] = useState({
         photos: [],
         existingPhotoIds: existingIds,
         existingPhotoPreviews: existingPreviews,
+        mainPhotoIndex: mainImageIndex >= 0 ? mainImageIndex : 0,
       });
 
       if (isAdmin) {
@@ -187,6 +191,11 @@ const [formData, setFormData] = useState({
       // Send existing photo IDs for update (so backend knows what to keep)
       if (id && formData.existingPhotoIds && formData.existingPhotoIds.length > 0) {
         data.append('existing_photo_ids', JSON.stringify(formData.existingPhotoIds));
+      }
+
+      // Send main photo index so backend knows which image to set as main
+      if (formData.mainPhotoIndex !== undefined) {
+        data.append('main_photo_index', String(formData.mainPhotoIndex));
       }
 
       if (formData.photos && formData.photos.length > 0) {
