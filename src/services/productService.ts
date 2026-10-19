@@ -13,17 +13,21 @@ export interface Product {
   rental_price: number;
   sale_price?: number;
   accessories?: string;
-  status: "available" | "rented" | "maintenance" | "discarded" | "transferring" | "reserved";
-  category_id: number;
-  store_id: number;
+  status: "available" | "rented" | "maintenance" | "discarded" | "transferring" | "reserved" | "laundry";
+  category_id: string;
+  store_id: string;
+  collection_id?: string;
   is_featured: boolean;
 
   // --- CAMPOS EXTRAS QUE VÊM DO JOIN ---
   image_url?: string;
   category_name?: string;
   store_name?: string;
+  collection_name?: string;
+  collection_slug?: string;
+  retired_at?: string | null;
 
-  images?: { id: number; url: string; url_thumb: string }[];
+  images?: { id: string; url: string; url_thumb: string }[];
 }
 
 export interface ProductTransfer {
@@ -63,9 +67,10 @@ export interface ReceiveProductDTO {
 }
 
 export const productService = {
-  // 1. LISTAR TODOS (Com Filtros de Categoria e Global)
+  // 1. LISTAR TODOS (Com Filtros de Categoria e Global) - Rota autenticada
   getAll: async (filters?: {
     categoryId?: string;
+    collectionId?: string;
     globalSearch?: boolean;
     status?: string;
     storeId?: string | number;
@@ -74,6 +79,10 @@ export const productService = {
 
     if (filters?.categoryId) {
       params.append("category_id", filters.categoryId);
+    }
+
+    if (filters?.collectionId) {
+      params.append("collection_id", filters.collectionId);
     }
 
     if (filters?.globalSearch) {
@@ -91,6 +100,44 @@ export const productService = {
 
     const queryString = params.toString();
     const url = queryString ? `/products?${queryString}` : "/products";
+
+    const response = await api.get(url);
+
+    return response.data.data || response.data || [];
+  },
+
+  // 1b. LISTAR TODOS PÚBLICO (Para Home Page) - Rota sem autenticação
+  getAllPublic: async (filters?: {
+    categoryId?: string;
+    collectionId?: string;
+    status?: string;
+    storeId?: string | number;
+    isFeatured?: boolean;
+  }) => {
+    const params = new URLSearchParams();
+
+    if (filters?.categoryId) {
+      params.append("category_id", filters.categoryId);
+    }
+
+    if (filters?.collectionId) {
+      params.append("collection_id", filters.collectionId);
+    }
+
+    if (filters?.status) {
+      params.append("status", filters.status);
+    }
+
+    if (filters?.storeId) {
+      params.append("store_id", String(filters.storeId));
+    }
+
+    if (filters?.isFeatured !== undefined) {
+      params.append("is_featured", String(filters.isFeatured));
+    }
+
+    const queryString = params.toString();
+    const url = queryString ? `/public/products?${queryString}` : "/public/products";
 
     const response = await api.get(url);
 

@@ -4,6 +4,7 @@ import { NumericFormat } from 'react-number-format';
 import { cn } from '../../utils/cn';
 import type { Category } from '../../services/categoryService';
 import type { Store } from '../../services/storeService';
+import type { Collection } from '../../services/collectionService';
 
 // Stable custom input component for NumericFormat - defined outside to maintain referential equality
 function NumericFormatCustomInput({ inputRef, onChange, onFocus, onBlur, required, placeholder, className, ...rest }: React.InputHTMLAttributes<HTMLInputElement> & { 
@@ -73,6 +74,7 @@ interface ProductFormModalProps {
     name: string;
     description: string;
     category_id: string;
+    collection_id: string;
     size: string;
     color: string;
     brand: string;
@@ -88,6 +90,7 @@ interface ProductFormModalProps {
   };
   setFormData: (data: any) => void;
   categories: Category[];
+  collections: Collection[];
   stores: Store[];
   isAdmin: boolean;
   handleSubmit: (e: React.FormEvent) => void;
@@ -100,7 +103,7 @@ interface ProductFormModalProps {
 
 export function ProductFormModal({
   isOpen, onClose, isEditing, currentStep, setCurrentStep,
-  formData, setFormData, categories, stores, isAdmin,
+  formData, setFormData, categories, collections, stores, isAdmin,
   handleSubmit, handleNextStep, handlePrevStep,
   validateStep1, validateStep2, validateStep3,
 }: ProductFormModalProps) {
@@ -468,6 +471,21 @@ export function ProductFormModal({
                     </select>
                   </div>
                   <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Coleção</label>
+                    <select
+                      name="collection_id"
+                      value={formData.collection_id}
+                      onChange={(e) => setFormData({ ...formData, collection_id: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                    >
+                      <option value="">Nenhuma coleção</option>
+                      {collections.map(col => (
+                        <option key={col.id} value={col.id}>{col.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Opcional: agrupe o produto em uma coleção para exibição na Home.</p>
+                  </div>
+                  <div>
                     <CurrencyInputBR
                       label="Preço Aluguel (R$) *"
                       value={formData.rental_price}
@@ -529,6 +547,10 @@ export function ProductFormModal({
                   <div className="bg-white p-3 rounded-lg border border-gray-100">
                     <p className="text-xs text-gray-500">Categoria</p>
                     <p className="font-medium text-gray-900">{categories.find(c => String(c.id) === formData.category_id)?.name || 'Não selecionada'}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-gray-100">
+                    <p className="text-xs text-gray-500">Coleção</p>
+                    <p className="font-medium text-gray-900">{collections.find(c => String(c.id) === formData.collection_id)?.name || 'Nenhuma'}</p>
                   </div>
                   <div className="bg-white p-3 rounded-lg border border-gray-100">
                     <p className="text-xs text-gray-500">Status</p>

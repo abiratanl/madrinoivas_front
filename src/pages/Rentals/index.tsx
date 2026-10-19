@@ -1,16 +1,49 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { UserPlus, Search, Package, Calendar, Loader2, RotateCcw, Trash2, ChevronDown, ChevronRight, Truck, Undo2, Ban, User, Edit2, DollarSign, FileText } from 'lucide-react';
 import { useRentals } from '../../hooks/useRentals';
 import { rentalService } from '../../services/rentalService';
+import { paymentService, type Payment, type RentalInstallment } from '../../services/paymentService';
 import { RentalModal } from './components/RentalModal';
 import { ContractModal } from './components/ContractModal';
 import { ReturnModal } from '../../components/rentals/ReturnModal';
+import {
+  PaymentModal,
+  PAYMENT_TYPE_OPTIONS,
+  PAYMENT_METHOD_OPTIONS,
+} from '../../components/rentals/PaymentModal';
+import { CancelPaymentModal } from '@/components/rentals/CancelPaymentModal';
 import { cn } from '../../utils/cn';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 
-function StopPropagationButton({ children, onClick, ...props }: { 
+const formatBRL = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+const INSTALLMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendente',
+  partially_paid: 'Parcialmente paga',
+  paid: 'Paga',
+  overdue: 'Vencida',
+  cancelled: 'Cancelada',
+};
+
+const INSTALLMENT_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-gray-100 text-gray-600',
+  partially_paid: 'bg-amber-100 text-amber-700',
+  paid: 'bg-green-100 text-green-700',
+  overdue: 'bg-red-100 text-red-700',
+  cancelled: 'bg-gray-100 text-gray-400 line-through',
+};
+
+const PAYMENT_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  PAYMENT_TYPE_OPTIONS.map((o) => [o.value, o.label])
+);
+const PAYMENT_METHOD_LABELS: Record<string, string> = Object.fromEntries(
+  PAYMENT_METHOD_OPTIONS.map((o) => [o.value, o.label])
+);
+
+function StopPropagationButton({ children, onClick, ...props }: {
   children: React.ReactNode; 
   onClick: () => void;
   className?: string;
@@ -26,20 +59,46 @@ function StopPropagationButton({ children, onClick, ...props }: {
   );
 }
 
-function ExpandedRowContent({ 
-  rental, 
-  rentalDetailsCache, 
-  availableProducts, 
-  customers, 
-  getProductName 
-}: { 
-  rental: any; 
-  rentalDetailsCache: Record<string, any>; 
-  availableProducts: any[]; 
-  customers: any[]; 
-  getProductName: (id: string) => string; 
+function ExpandedRowContent({
+  rental,
+  rentalDetailsCache,
+  availableProducts,
+  customers,
+  getProductName,
+  canManagePayments,
+  onEditPayment,
+  onCancelPayment,
+}: {
+  rental: any;
+  rentalDetailsCache: Record<string, any>;
+  availableProducts: any[];
+  customers: any[];
+  getProductName: (id: string) => string;
+  canManagePayments: boolean;
+  onEditPayment: (payment: Payment) => void;
+  onCancelPayment: (payment: Payment) => void;
 }) {
   const detailed = rentalDetailsCache[rental.id];
+
+  // Load payment history so the financial summary reflects what was already paid.
+  // Re-fetches whenever the cached details are invalidated (e.g. after a new payment).
+  const [payments, setPayments] = useState<Payment[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setPayments(null);
+    paymentService
+      .getByRental(rental.id)
+      .then((data) => {
+        if (!cancelled) setPayments(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setPayments([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rental.id, detailed]);
+
   if (!detailed) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -64,6 +123,12 @@ function ExpandedRowContent({
   const discount = itemsSubtotal - totalPrice + penaltyFee;
   const hasDiscount = discount > 0.01;
   const hasPenalty = penaltyFee > 0.01;
+
+  const totalPaid = (payments || [])
+    .filter((p) => p.status !== 'cancelled')
+    .reduce((sum: number, p) => sum + parseFloat(String(p.amount || 0)), 0);
+  const remainingBalance = Math.max(0, totalPrice - totalPaid);
+  const installments: RentalInstallment[] = detailed.installments || [];
   
   const getItemCount = (rental: any) => (rental.items || []).reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
 
@@ -183,8 +248,140 @@ function ExpandedRowContent({
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPrice)}
             </span>
           </div>
+          {payments === null ? (
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-200 text-gray-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Carregando pagamentos...</span>
+            </div>
+          ) : (
+            <div className="border-t border-gray-200 pt-2 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total pago:</span>
+                <span className="font-bold text-green-600">{formatBRL(totalPaid)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-bold text-gray-800">Saldo devedor:</span>
+                <span className={cn('font-bold', remainingBalance > 0 ? 'text-rose-600' : 'text-green-600')}>
+                  {formatBRL(remainingBalance)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {installments.length > 0 && (
+            <div className="border-t border-gray-200 pt-3 space-y-1.5">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Parcelas</p>
+              {installments.map((inst) => {
+                const instValue = Number(inst.value || 0);
+                const instPaid = Number(inst.amount_paid || 0);
+                const isPenalty = inst.type === 'penalty';
+                return (
+                  <div key={inst.id} className="flex items-center justify-between gap-2">
+                    <span className="text-gray-600">
+                      {isPenalty
+                        ? 'Multa por atraso'
+                        : `Parcela ${inst.number}/${inst.total_installments}`}{' '}
+                      — vence {new Date(inst.due_date).toLocaleDateString('pt-BR')}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-medium text-gray-800">
+                        {formatBRL(instPaid)} / {formatBRL(instValue)}
+                      </span>
+                      <span
+                        className={cn(
+                          'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tighter',
+                          INSTALLMENT_STATUS_COLORS[inst.status] || 'bg-gray-100 text-gray-600'
+                        )}
+                      >
+                        {INSTALLMENT_STATUS_LABELS[inst.status] || inst.status}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Histórico de Pagamentos */}
+      {payments !== null && payments.length > 0 && (
+        <div className="mt-4 bg-gray-50 rounded-lg p-4 border border-gray-100">
+          <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-rose-600" />
+            Histórico de Pagamentos ({payments.length})
+          </h4>
+          <div className="space-y-2">
+            {payments.map((payment) => {
+              const isCancelled = payment.status === 'cancelled';
+              return (
+                <div
+                  key={payment.id}
+                  className={cn(
+                    'flex items-center justify-between gap-2 bg-white rounded-lg p-3 border text-sm',
+                    isCancelled ? 'border-gray-200 opacity-60' : 'border-gray-100'
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={cn(
+                          'font-bold',
+                          isCancelled ? 'text-gray-400 line-through' : 'text-green-600'
+                        )}
+                      >
+                        {formatBRL(parseFloat(String(payment.amount || 0)))}
+                      </span>
+                      <span
+                        className={cn(
+                          'text-gray-600',
+                          isCancelled && 'line-through text-gray-400'
+                        )}
+                      >
+                        {PAYMENT_TYPE_LABELS[payment.type] || payment.type} •{' '}
+                        {PAYMENT_METHOD_LABELS[payment.payment_method] || payment.payment_method}
+                      </span>
+                      {isCancelled && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tighter bg-gray-100 text-gray-500">
+                          Cancelado
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(payment.paid_at).toLocaleDateString('pt-BR')}
+                      {payment.user_name && ` • Registrado por ${payment.user_name}`}
+                    </p>
+                    {isCancelled && payment.cancellation_reason && (
+                      <p className="text-xs text-gray-400 mt-0.5 italic">
+                        Motivo: {payment.cancellation_reason}
+                        {payment.cancelled_by_name && ` (por ${payment.cancelled_by_name})`}
+                      </p>
+                    )}
+                  </div>
+                  {!isCancelled && canManagePayments && (
+                    <div className="flex gap-1">
+                      <StopPropagationButton
+                        onClick={() => onEditPayment(payment)}
+                        title="Editar Pagamento"
+                        className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </StopPropagationButton>
+                      <StopPropagationButton
+                        onClick={() => onCancelPayment(payment)}
+                        title="Cancelar Pagamento"
+                        className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all active:scale-90"
+                      >
+                        <Ban className="w-4 h-4" />
+                      </StopPropagationButton>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Observações */}
       {detailed.notes && (
@@ -251,6 +448,8 @@ export default function Rentals() {
     validateStep3,
     loadRentalDetails,
     rentalDetailsCache,
+    clearRentalDetailsCache,
+    loadRentals,
     loadingCancelled,
     loadingReturned,
     hasLoadedCancelled,
@@ -260,7 +459,7 @@ export default function Rentals() {
   } = useRentals();
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<'return' | 'cancel' | 'payment' | 'pickup' | 'contract' | 'delete' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'return' | 'cancel' | 'pickup' | 'contract' | 'delete' | null>(null);
   const [confirmRentalId, setConfirmRentalId] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [expandingRow, setExpandingRow] = useState<string | null>(null);
@@ -271,7 +470,34 @@ export default function Rentals() {
   const [returnModalRentalId, setReturnModalRentalId] = useState<string | null>(null);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
 
+  // Payment modal state
+  const [paymentRentalId, setPaymentRentalId] = useState<string | null>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [cancellingPayment, setCancellingPayment] = useState<Payment | null>(null);
+
   const { selectedStore, user } = useAuth();
+  const canManagePayments = !!user?.role && ['admin', 'owner'].includes(user.role.toLowerCase());
+
+  const handleEditPayment = (payment: Payment) => {
+    setEditingPayment(payment);
+    setPaymentRentalId(payment.rental_id);
+    setIsPaymentModalOpen(true);
+  };
+
+  const handleCancelPayment = (payment: Payment) => {
+    setCancellingPayment(payment);
+  };
+
+  // Refresh balances and the list after a payment is created/edited/cancelled
+  const refreshAfterPaymentChange = (rentalId: string | null) => {
+    if (rentalId) {
+      clearRentalDetailsCache(rentalId);
+      // If the row is expanded, reload its details immediately
+      if (expandedRow === rentalId) loadRentalDetails(rentalId);
+    }
+    loadRentals({ status: statusFilter || undefined });
+  };
   
   // Store data for contract
   const storeData = {
@@ -299,6 +525,11 @@ export default function Rentals() {
     if (action === 'return') {
       setReturnModalRentalId(id);
       setIsReturnModalOpen(true);
+      return;
+    }
+    if (action === 'payment') {
+      setPaymentRentalId(id);
+      setIsPaymentModalOpen(true);
       return;
     }
     setConfirmAction(action);
@@ -423,9 +654,6 @@ export default function Rentals() {
         return;
       }
       await handlePickup(confirmRentalId);
-    } else if (confirmAction === 'payment') {
-      // TODO: Implementar modal de registro de pagamento
-      toast('Funcionalidade de pagamento a ser implementada', { icon: '💰' });
     }
     
     setIsConfirmOpen(false);
@@ -742,6 +970,9 @@ export default function Rentals() {
                                 availableProducts={availableProducts}
                                 customers={customers}
                                 getProductName={getProductName}
+                                canManagePayments={canManagePayments}
+                                onEditPayment={handleEditPayment}
+                                onCancelPayment={handleCancelPayment}
                               />
                             </div>
                           </td>
@@ -764,23 +995,19 @@ export default function Rentals() {
         title={
           confirmAction === 'cancel' ? 'Cancelar Aluguel' :
           confirmAction === 'pickup' ? 'Marcar como Retirado' :
-          confirmAction === 'delete' ? 'Excluir Permanentemente' :
-          'Registrar Pagamento'
+          'Excluir Permanentemente'
         }
         description={
           confirmAction === 'cancel'
             ? 'Esta ação cancelará o aluguel. Somente aluguéis não retirados podem ser cancelados.'
             : confirmAction === 'pickup'
             ? 'Esta ação marcará o aluguel como retirado pelo cliente.'
-            : confirmAction === 'delete'
-            ? 'Esta ação excluirá PERMANENTEMENTE o aluguel cancelado. Esta ação NÃO PODE SER DESFEITA.'
-            : 'Abrir tela para registrar pagamento deste aluguel.'
+            : 'Esta ação excluirá PERMANENTEMENTE o aluguel cancelado. Esta ação NÃO PODE SER DESFEITA.'
         }
         confirmText={
           confirmAction === 'cancel' ? 'Sim, Cancelar' :
           confirmAction === 'pickup' ? 'Confirmar Retirada' :
-          confirmAction === 'delete' ? 'Sim, Excluir Permanentemente' :
-          'Registrar Pagamento'
+          'Sim, Excluir Permanentemente'
         }
         variant={
           confirmAction === 'delete' || confirmAction === 'cancel' ? 'danger' : 'warning'
@@ -853,6 +1080,38 @@ export default function Rentals() {
           }
         }}
         rentalStatus={allRentals.find(r => r.id === returnModalRentalId)?.status || 'picked_up'}
+      />
+
+      {/* MODAL DE PAGAMENTO */}
+      <PaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => {
+          setIsPaymentModalOpen(false);
+          setPaymentRentalId(null);
+          setEditingPayment(null);
+        }}
+        rentalId={editingPayment?.rental_id || paymentRentalId}
+        customerName={
+          editingPayment
+            ? allRentals.find((r) => r.id === editingPayment.rental_id)?.customer_name
+            : allRentals.find((r) => r.id === paymentRentalId)?.customer_name
+        }
+        payment={editingPayment}
+        onSuccess={() => {
+          refreshAfterPaymentChange(editingPayment?.rental_id || paymentRentalId);
+          setEditingPayment(null);
+        }}
+      />
+
+      {/* MODAL DE CANCELAMENTO DE PAGAMENTO */}
+      <CancelPaymentModal
+        isOpen={!!cancellingPayment}
+        onClose={() => setCancellingPayment(null)}
+        payment={cancellingPayment}
+        onSuccess={() => {
+          refreshAfterPaymentChange(cancellingPayment?.rental_id || null);
+          setCancellingPayment(null);
+        }}
       />
     </div>
   );

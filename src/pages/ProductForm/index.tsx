@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { productService } from '../../services/productService';
 import { categoryService, type Category } from '../../services/categoryService';
 import { storeService, type Store } from '../../services/storeService';
+import { collectionService, type Collection } from '../../services/collectionService';
 import { ProductFormModal } from './ProductFormModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -15,17 +16,19 @@ function ProductForm() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
 
-  const [categories, setCategories] = useState<Category[]>([]);
+const [categories, setCategories] = useState<Category[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(true);
 
-const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState({
     code: '',
     name: '',
     description: '',
     category_id: '',
+    collection_id: '',
     size: '',
     color: '',
     brand: '',
@@ -65,11 +68,16 @@ const [formData, setFormData] = useState({
 
   const loadDependencies = useCallback(async () => {
     try {
-      const catResponse: any = await categoryService.getAll();
-      const list = Array.isArray(catResponse) ? catResponse : (catResponse.data || []);
-      setCategories(list);
+      const [catResponse, colResponse]: any = await Promise.all([
+        categoryService.getAll(),
+        collectionService.getAll({ isActive: true }),
+      ]);
+      const catList = Array.isArray(catResponse) ? catResponse : (catResponse.data || []);
+      const colList = Array.isArray(colResponse) ? colResponse : (colResponse.data || []);
+      setCategories(catList);
+      setCollections(colList);
     } catch (error) {
-      console.error('Erro ao carregar categorias', error);
+      console.error('Erro ao carregar categorias/coleções', error);
     }
   }, []);
 
@@ -90,6 +98,7 @@ const [formData, setFormData] = useState({
         name: p.name || '',
         description: p.description || '',
         category_id: p.category_id ? String(p.category_id) : '',
+        collection_id: p.collection_id ? String(p.collection_id) : '',
         size: p.size || '',
         color: p.color || '',
         brand: p.brand || '',
@@ -242,6 +251,7 @@ const [formData, setFormData] = useState({
         formData={formData}
         setFormData={setFormData}
         categories={categories}
+        collections={collections}
         stores={stores}
         isAdmin={isAdmin}
         handleSubmit={handleSubmit}

@@ -197,6 +197,16 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     }
   }, [computeLateStatus]);
 
+  // Invalidate cached rental details (e.g. after a payment changes the financial data)
+  const clearRentalDetailsCache = useCallback((id?: string) => {
+    setRentalDetailsCache(prev => {
+      if (!id) return {};
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
   const loadCustomers = useCallback(async () => {
     try {
       const data = await customerService.getAll('', true);
@@ -554,6 +564,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     loadRentals,
     loadRentalDetails,
     rentalDetailsCache,
+    clearRentalDetailsCache,
     validateStep1,
     validateStep2,
     validateStep3,
