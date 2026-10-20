@@ -54,7 +54,9 @@ export function PaymentModal({
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [penaltyFee, setPenaltyFee] = useState(0);
   const [totalPaid, setTotalPaid] = useState(0);
+  const [penaltyPaid, setPenaltyPaid] = useState(0);
   const [openInstallments, setOpenInstallments] = useState<RentalInstallment[]>([]);
   const [linkedInstallment, setLinkedInstallment] = useState<RentalInstallment | null>(null);
 
@@ -63,13 +65,8 @@ export function PaymentModal({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
   const [installmentId, setInstallmentId] = useState('');
   const [notes, setNotes] = useState('');
+  const [includePenalty, setIncludePenalty] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
-  // In edit mode the payment's own amount is added back to the available balance
-  const remainingBalance = useMemo(
-    () => Math.max(0, totalAmount - totalPaid + (isEditMode ? paymentAmount : 0)),
-    [totalAmount, totalPaid, isEditMode, paymentAmount]
-  );
 
   // Remaining value of an installment; in edit mode the payment's own amount is
   // added back for the installment currently linked to the payment
@@ -77,6 +74,77 @@ export function PaymentModal({
     const remaining = parseFloat(String(inst.value)) - parseFloat(String(inst.amount_paid || 0));
     return isEditMode && payment?.installment_id === inst.id ? remaining + paymentAmount : remaining;
   };
+
+  // Late-return penalty: tracked through its own installment (type 'penalty') so
+  // it can be charged as a separate payment record for managerial reporting
+  const penaltyInstallment = useMemo(() => {
+    const candidates = linkedInstallment ? [...openInstallments, linkedInstallment] : openInstallments;
+    return candidates.find((i) => i.type === 'penalty') || null;
+  }, [openInstallments, linkedInstallment]);
+
+  // Penalty still owed: the rental's penalty_fee minus what was already paid
+  // against the penalty installment. The fee (not the installment value) is the
+  // source of truth, keeping this consistent with the financial summary.
+  const penaltyRemaining = useMemo(() => {
+    const base =
+      penaltyFee > 0
+        ? Math.max(0, penaltyFee - penaltyPaid)
+        : penaltyInstallment
+          ? Math.max(
+              0,
+              parseFloat(String(penaltyInstallment.value)) -
+                parseFloat(String(penaltyInstallment.amount_paid || 0))
+            )
+          : 0;
+    return isEditMode && payment?.installment_id && payment.installment_id === penaltyInstallment?.id
+      ? base + paymentAmount
+      : base;
+  }, [penaltyFee, penaltyPaid, penaltyInstallment, isEditMode, payment, paymentAmount]);
+
+  const isPenaltySelected = !!penaltyInstallment && installmentId === penaltyInstallment.id;
+
+  // Penalty line with checkbox: create mode only, while the penalty is still open
+  // and not already being paid through its installment in the dropdown
+  const showPenaltyLine = !isEditMode && penaltyRemaining > 0 && !isPenaltySelected;
+
+  // In edit mode the payment's own amount is added back to the available balance.
+  // total_amount already includes the penalty fee (items - discount + penalty),
+  // so the overall balance covers the fine as well.
+  const rentalBalance = useMemo(
+    () => Math.max(0, totalAmount - totalPaid + (isEditMode ? paymentAmount : 0)),
+    [totalAmount, totalPaid, isEditMode, paymentAmount]
+  );
+
+  // The typed amount is the total being charged now. When the penalty checkbox
+  // is checked, the ceiling includes the unpaid penalty; unchecked, the penalty
+  // is reserved and cannot be charged here. Selecting the penalty installment
+  // in the dropdown also unlocks the full balance.
+  const chargePenalty = showPenaltyLine && includePenalty;
+  const amountCeiling =
+    isPenaltySelected || chargePenalty
+      ? rentalBalance
+      : Math.max(0, rentalBalance - Math.min(penaltyRemaining, rentalBalance));
+
+  // total_amount already includes the penalty fee, so the rental's base value
+  // is the total minus the fee. Showing both lines additively keeps the
+  // summary arithmetic consistent (base + penalty - paid = balance).
+  const baseAmount = Math.max(0, totalAmount - penaltyFee);
+
+  // Balance displayed in the summary follows the penalty checkbox: unchecked
+  // means the penalty is not being charged now, so the chargeable balance
+  // excludes it. When the penalty installment is selected in the dropdown the
+  // full balance is always shown.
+  const displayedBalance =
+    showPenaltyLine && !includePenalty ? amountCeiling : rentalBalance;
+
+  // Keep the typed amount within the ceiling when the checkbox toggles:
+  // an amount that included the penalty is clamped once it is unchecked
+  useEffect(() => {
+    const typed = parseCurrency(amount);
+    if (!Number.isNaN(typed) && typed > amountCeiling + 0.009) {
+      setAmount(amountCeiling > 0 ? numberToCurrencyInput(amountCeiling) : '');
+    }
+  }, [amountCeiling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load financial summary (rental details + payment history) whenever the modal opens
   useEffect(() => {
@@ -99,6 +167,7 @@ export function PaymentModal({
         setPaymentMethod('pix');
         setInstallmentId('');
         setNotes('');
+        setIncludePenalty(true);
       }
 
       try {
@@ -109,12 +178,19 @@ export function PaymentModal({
 
         const rental = details?.data || details;
         setTotalAmount(parseFloat(rental.total_amount || '0'));
+        setPenaltyFee(parseFloat(rental.penalty_fee || '0'));
         setTotalPaid(
           (Array.isArray(payments) ? payments : [])
             .filter((p) => p.status !== 'cancelled')
             .reduce((sum, p) => sum + parseFloat(String(p.amount || 0)), 0)
         );
         const allInstallments: RentalInstallment[] = rental.installments || [];
+        const penaltyInst = allInstallments.find((i) => i.type === 'penalty');
+        setPenaltyPaid(
+          (Array.isArray(payments) ? payments : [])
+            .filter((p) => p.status !== 'cancelled' && penaltyInst && p.installment_id === penaltyInst.id)
+            .reduce((sum, p) => sum + parseFloat(String(p.amount || 0)), 0)
+        );
         setOpenInstallments(
           allInstallments.filter((i) => ['pending', 'partially_paid', 'overdue'].includes(i.status))
         );
@@ -152,16 +228,17 @@ export function PaymentModal({
     setType('installment');
     const inst = selectableInstallments.find((i) => i.id === id);
     if (inst) {
-      const suggested = Math.min(getInstallmentRemaining(inst), remainingBalance);
+      const suggested = Math.min(getInstallmentRemaining(inst), amountCeiling);
       if (suggested > 0) setAmount(numberToCurrencyInput(suggested));
     }
   };
 
   const numericAmount = parseCurrency(amount);
   const isAmountInvalid =
-    Number.isNaN(numericAmount) || numericAmount <= 0 || numericAmount > remainingBalance + 0.009;
+    Number.isNaN(numericAmount) || numericAmount <= 0 || numericAmount > amountCeiling + 0.009;
   const isInstallmentMissing = type === 'installment' && !installmentId;
-  const canSubmit = !loadingSummary && !submitting && !isAmountInvalid && !isInstallmentMissing && remainingBalance > 0;
+  const canSubmit =
+    !loadingSummary && !submitting && !isAmountInvalid && !isInstallmentMissing && amountCeiling > 0;
 
   const handleSubmit = async () => {
     if (!rentalId || !canSubmit) return;
@@ -178,14 +255,36 @@ export function PaymentModal({
         });
         toast.success('Pagamento atualizado com sucesso!');
       } else {
-        await paymentService.create({
-          rental_id: rentalId,
-          installment_id: installmentId || null,
-          amount: numericAmount,
-          type,
-          payment_method: paymentMethod,
-          notes: notes.trim() || undefined,
-        });
+        // The typed amount may include the penalty (checkbox). The penalty part
+        // is recorded as its own payment, linked to the penalty installment,
+        // so it can be tracked separately in reports.
+        const penaltyPart = chargePenalty ? Math.min(penaltyRemaining, numericAmount) : 0;
+        const mainAmount = numericAmount - penaltyPart;
+        if (mainAmount > 0) {
+          await paymentService.create({
+            rental_id: rentalId,
+            installment_id: installmentId || null,
+            amount: mainAmount,
+            type,
+            payment_method: paymentMethod,
+            notes: notes.trim() || undefined,
+          });
+        }
+        if (penaltyPart > 0) {
+          try {
+            await paymentService.create({
+              rental_id: rentalId,
+              installment_id: penaltyInstallment?.id || null,
+              amount: penaltyPart,
+              type: penaltyInstallment ? 'installment' : 'spontaneous',
+              payment_method: paymentMethod,
+              notes: 'Multa por atraso',
+            });
+          } catch (penaltyErr) {
+            console.error('Error registering penalty payment:', penaltyErr);
+            toast.error('Pagamento registrado, mas houve erro ao lançar a multa. Registre-a separadamente.');
+          }
+        }
         toast.success('Pagamento registrado com sucesso!');
       }
       onSuccess();
@@ -239,22 +338,61 @@ export function PaymentModal({
               {/* Financial summary */}
               <div className="mb-5 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Valor total do aluguel:</span>
-                  <span className="font-medium text-gray-800">{formatBRL(totalAmount)}</span>
+                  <span className="text-gray-500">
+                    {penaltyFee > 0 ? 'Valor do aluguel (sem multa):' : 'Valor total do aluguel:'}
+                  </span>
+                  <span className="font-medium text-gray-800">{formatBRL(baseAmount)}</span>
                 </div>
+                {penaltyFee > 0 && (
+                  <div className="flex justify-between items-center">
+                    <label
+                      className={cn(
+                        'flex items-center gap-2 text-gray-500',
+                        showPenaltyLine && 'cursor-pointer select-none'
+                      )}
+                    >
+                      {showPenaltyLine && (
+                        <input
+                          type="checkbox"
+                          checked={includePenalty}
+                          onChange={(e) => setIncludePenalty(e.target.checked)}
+                          className="w-4 h-4 accent-rose-600 cursor-pointer"
+                        />
+                      )}
+                      Multa por atraso:
+                    </label>
+                    <span
+                      className={cn(
+                        'font-medium',
+                        penaltyRemaining > 0 ? 'text-amber-600' : 'text-green-600'
+                      )}
+                    >
+                      {formatBRL(penaltyFee)}
+                      {penaltyRemaining <= 0 && ' (quitada)'}
+                      {showPenaltyLine && !includePenalty && ' (não cobrada)'}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-500">Total já pago:</span>
                   <span className="font-medium text-green-600">{formatBRL(totalPaid)}</span>
                 </div>
                 <div className="flex justify-between border-t border-gray-200 pt-2">
-                  <span className="font-bold text-gray-800">Saldo devedor:</span>
-                  <span className={cn('font-bold', remainingBalance > 0 ? 'text-rose-600' : 'text-green-600')}>
-                    {formatBRL(remainingBalance)}
+                  <span className="font-bold text-gray-800">
+                    {showPenaltyLine && !includePenalty ? 'Saldo a cobrar:' : 'Saldo devedor:'}
+                  </span>
+                  <span
+                    className={cn(
+                      'font-bold',
+                      displayedBalance > 0 ? 'text-rose-600' : 'text-green-600'
+                    )}
+                  >
+                    {formatBRL(displayedBalance)}
                   </span>
                 </div>
               </div>
 
-              {remainingBalance <= 0 ? (
+              {amountCeiling <= 0 ? (
                 <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 font-medium text-center">
                   Este aluguel já está totalmente quitado.
                 </div>
@@ -266,10 +404,10 @@ export function PaymentModal({
                       <label className="text-sm font-medium text-gray-700">Valor a pagar</label>
                       <button
                         type="button"
-                        onClick={() => setAmount(numberToCurrencyInput(remainingBalance))}
+                        onClick={() => setAmount(numberToCurrencyInput(amountCeiling))}
                         className="text-xs font-semibold text-rose-600 hover:text-rose-700"
                       >
-                        Quitar saldo ({formatBRL(remainingBalance)})
+                        Quitar saldo ({formatBRL(amountCeiling)})
                       </button>
                     </div>
                     <input
@@ -287,7 +425,7 @@ export function PaymentModal({
                     />
                     {amount && isAmountInvalid && (
                       <p className="mt-1 text-xs text-red-600">
-                        Informe um valor maior que zero e até o saldo devedor ({formatBRL(remainingBalance)}).
+                        Informe um valor maior que zero e até o saldo devedor ({formatBRL(amountCeiling)}).
                       </p>
                     )}
                   </div>
@@ -331,9 +469,9 @@ export function PaymentModal({
                         <option value="">Nenhuma (pagamento avulso)</option>
                         {selectableInstallments.map((inst) => (
                           <option key={inst.id} value={inst.id}>
-                            Parcela {inst.number}/{inst.total_installments} —{' '}
-                            {formatBRL(getInstallmentRemaining(inst))} restantes (vence{' '}
-                            {new Date(inst.due_date).toLocaleDateString('pt-BR')})
+                            {inst.type === 'penalty'
+                              ? `Multa por atraso — ${formatBRL(getInstallmentRemaining(inst))} restantes`
+                              : `Parcela ${inst.number}/${inst.total_installments} — ${formatBRL(getInstallmentRemaining(inst))} restantes (vence ${new Date(inst.due_date).toLocaleDateString('pt-BR')})`}
                           </option>
                         ))}
                       </select>
