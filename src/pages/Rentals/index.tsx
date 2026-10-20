@@ -64,7 +64,6 @@ function ExpandedRowContent({
   rentalDetailsCache,
   availableProducts,
   customers,
-  getProductName,
   canManagePayments,
   onEditPayment,
   onCancelPayment,
@@ -73,7 +72,6 @@ function ExpandedRowContent({
   rentalDetailsCache: Record<string, any>;
   availableProducts: any[];
   customers: any[];
-  getProductName: (id: string) => string;
   canManagePayments: boolean;
   onEditPayment: (payment: Payment) => void;
   onCancelPayment: (payment: Payment) => void;
@@ -165,9 +163,10 @@ function ExpandedRowContent({
         <div className="space-y-2">
           {items.map((item: any, idx: number) => {
             const product = availableProducts.find(p => p.id === item.product_id);
-            const productName = product?.name || item.product?.name || getProductName(item.product_id);
-            const productCode = product?.code || item.product?.code || '';
+            const productName = item.product_name || product?.name || item.product?.name || 'Produto não encontrado';
+            const productCode = item.product_code || product?.code || item.product?.code || '';
             const productSize = product?.size || item.product?.size || '';
+            const productImage = item.image_url || product?.image_url || '';
             const unitPrice = Number(item.unit_price || product?.rental_price || item.product?.rental_price || 0);
             const qty = Number(item.quantity || 1);
             const subtotal = unitPrice * qty;
@@ -176,8 +175,8 @@ function ExpandedRowContent({
             return (
               <div key={`${rental.id}-${itemKey}-${idx}`} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                 <div className="flex items-center gap-3 mb-2">
-                  {product?.image_url && (
-                    <img src={product.image_url} alt={productName} className="w-12 h-12 object-cover rounded" />
+                  {productImage && (
+                    <img src={productImage} alt={productName} className="w-12 h-12 object-cover rounded" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-800 truncate">{productName}</p>
@@ -285,7 +284,9 @@ function ExpandedRowContent({
                     </span>
                     <span className="flex items-center gap-2">
                       <span className="font-medium text-gray-800">
-                        {formatBRL(instPaid)} / {formatBRL(instValue)}
+                        {instPaid > 0 && instPaid < instValue
+                          ? `${formatBRL(instPaid)} / ${formatBRL(instValue)}`
+                          : formatBRL(instValue)}
                       </span>
                       <span
                         className={cn(
@@ -440,7 +441,6 @@ export default function Rentals() {
     handleDelete,
     handleSearch,
     handleStatusFilter,
-    getProductName,
     getStatusColor,
     getStatusLabel,
     validateStep1,
@@ -969,7 +969,6 @@ export default function Rentals() {
                                 rentalDetailsCache={rentalDetailsCache}
                                 availableProducts={availableProducts}
                                 customers={customers}
-                                getProductName={getProductName}
                                 canManagePayments={canManagePayments}
                                 onEditPayment={handleEditPayment}
                                 onCancelPayment={handleCancelPayment}
@@ -1041,7 +1040,6 @@ export default function Rentals() {
         validateStep1={validateStep1}
         validateStep2={validateStep2}
         validateStep3={validateStep3}
-        getProductName={getProductName}
       />
 
       {/* MODAL DE CONTRATO */}

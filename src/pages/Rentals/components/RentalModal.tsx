@@ -38,7 +38,6 @@ interface RentalModalProps {
   validateStep1: () => boolean;
   validateStep2: () => boolean;
   validateStep3: () => boolean;
-  getProductName: (id: string) => string;
 }
 
 // Date Picker Component with dd/mm/yyyy format and calendar
@@ -201,7 +200,6 @@ export function RentalModal({
   formData, setFormData, customers, availableProducts,
   handleSubmit, addProduct, removeProduct, updateProductQuantity,
   handleNextStep, handlePrevStep, validateStep1, validateStep2, validateStep3,
-  getProductName,
 }: RentalModalProps) {
   const [customerSearch, setCustomerSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
@@ -243,7 +241,8 @@ export function RentalModal({
   const calculateSubtotal = () => {
     return formData.products.reduce((sum, item) => {
       const product = availableProducts.find(p => String(p.id) === String(item.id));
-      return sum + (product?.rental_price || 0) * (item.quantity || 1);
+      const price = product?.rental_price ?? item.rental_price ?? 0;
+      return sum + price * (item.quantity || 1);
     }, 0);
   };
 
@@ -355,15 +354,20 @@ export function RentalModal({
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {formData.products.map((item) => {
                       const product = availableProducts.find(p => String(p.id) === String(item.id));
+                      const displayName = product ? `${product.name} (${product.code})` : (item.name || 'Produto não encontrado');
+                      const displayCode = product?.code || item.code || '';
+                      const displaySize = product?.size || item.size || '-';
+                      const displayPrice = product?.rental_price ?? item.rental_price ?? 0;
+                      const displayImage = product?.image_url || item.image_url || '';
                       return (
                         <div key={item.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-100">
                           <div className="flex items-center gap-3">
-                            {product?.image_url && (
-                              <img src={product.image_url} alt={product.name} className="w-12 h-12 object-cover rounded" />
+                            {displayImage && (
+                              <img src={displayImage} alt={displayName} className="w-12 h-12 object-cover rounded" />
                             )}
                             <div>
-                              <p className="font-medium text-gray-800">{getProductName(item.id)}</p>
-                              <p className="text-xs text-gray-500">Tam: {product?.size} • R$ {product?.rental_price || 0}/dia</p>
+                              <p className="font-medium text-gray-800">{displayName}</p>
+                              <p className="text-xs text-gray-500">{displayCode ? `${displayCode} • ` : ''}Tam: {displaySize} • R$ {displayPrice}/dia</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">

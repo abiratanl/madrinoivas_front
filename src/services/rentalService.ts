@@ -4,13 +4,19 @@ import { api } from './api';
 export interface RentalProductItem {
   id: string;     // ID do produto (UUID)
   quantity?: number; // Backend assume 1 se não enviar, mas bom ter
+  // Campos apenas para exibição no front (o backend ignora no payload)
+  name?: string;
+  code?: string;
+  size?: string;
+  rental_price?: number;
+  image_url?: string;
 }
 
 // Interface para criar um aluguel (Payload do POST)
 export interface CreateRentalDTO {
   customer_id: string;
-  start_date: string;       // Formato ISO ou YYYY-MM-DD
-  end_date_scheduled: string;
+  start_date?: string;      // Formato ISO ou YYYY-MM-DD
+  end_date_scheduled?: string;
   products?: RentalProductItem[]; // Array de produtos (opcional para update)
   installments_config?: any;     // Configuração de parcelamento (se houver)
   store_id?: string;             // Opcional (backend pega do token se for vendedor)

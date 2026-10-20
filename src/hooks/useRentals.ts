@@ -37,6 +37,8 @@ export function useRentals() {
   const [isEditing, setIsEditing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
 const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
+  // Real status of the rental being edited (picked_up/late restrict what can change)
+  const [editingRentalStatus, setEditingRentalStatus] = useState<string | null>(null);
   const [originalProducts, setOriginalProducts] = useState<RentalProductItem[]>([]);
    
   const [formData, setFormData] = useState<RentalFormData>(initialFormState);
@@ -286,7 +288,12 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       
       const loadedProducts = rental.items?.map((item: any) => ({ 
         id: item.product_id || item.productId || item.id, 
-        quantity: item.quantity || 1 
+        quantity: item.quantity || 1,
+        name: item.product_name || item.product?.name || undefined,
+        code: item.product_code || item.product?.code || undefined,
+        size: item.size || item.product?.size || undefined,
+        rental_price: item.unit_price != null ? Number(item.unit_price) : undefined,
+        image_url: item.image_url || item.product?.image_url || undefined,
       })) || [];
       
       setFormData({
@@ -302,6 +309,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       setOriginalProducts(loadedProducts);
       setIsEditing(true);
       setEditingRentalId(id);
+      setEditingRentalStatus(rental.status || null);
       setCurrentStep(2); // Start at step 2 (products) since client can't be changed
       setIsModalOpen(true);
     } catch (error) {
@@ -315,6 +323,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     setFormData(initialFormState);
     setIsEditing(false);
     setEditingRentalId(null);
+    setEditingRentalStatus(null);
     setOriginalProducts([]);
     setCurrentStep(1);
   };
@@ -408,6 +417,17 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       payload.products = formData.products;
     }
 
+    // Ongoing rentals (picked_up/late): only financial fields may change.
+    // Items, dates and status are locked in the backend, so don't send them.
+    const isOngoingEdit =
+      isEditing && !!editingRentalStatus && ['picked_up', 'late'].includes(editingRentalStatus);
+    if (isOngoingEdit) {
+      delete payload.products;
+      delete payload.start_date;
+      delete payload.end_date_scheduled;
+      delete payload.status;
+    }
+
     try {
       let createdRental: any = null;
       if (isEditing && editingRentalId) {
@@ -493,11 +513,6 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     }
   };
 
-  const getProductName = (productId: string) => {
-    const product = availableProducts.find(p => String(p.id) === String(productId));
-    return product ? `${product.name} (${product.code})` : 'Produto não encontrado';
-  };
-
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       active: 'bg-blue-50 text-blue-600 border-blue-100',
@@ -558,7 +573,6 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     handleDelete,
     handleSearch,
     handleStatusFilter,
-    getProductName,
     getStatusColor,
     getStatusLabel,
     loadRentals,
