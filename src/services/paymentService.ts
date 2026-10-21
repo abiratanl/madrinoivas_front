@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api } from '@/lib/axios';
 
 export type PaymentType = 'entry' | 'installment' | 'spontaneous' | 'pickup_balance';
 export type PaymentMethod = 'cash' | 'credit_card' | 'debit_card' | 'pix' | 'bank_transfer';

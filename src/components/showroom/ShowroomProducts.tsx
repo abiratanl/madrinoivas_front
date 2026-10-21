@@ -5,7 +5,7 @@ import { categoryService, type Category } from '../../services/categoryService';
 import { collectionService, type Collection } from '../../services/collectionService';
 import { cn } from '../../utils/cn';
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../services/api';
+import { api } from '@/lib/axios';
 
 const ProductSkeleton = () => (
   <div className="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-100 animate-pulse">

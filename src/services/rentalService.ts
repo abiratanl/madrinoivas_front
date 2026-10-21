@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api } from '@/lib/axios';
 
 // Interface para o item do aluguel (frontend envia ID e Quantidade)
 export interface RentalProductItem {

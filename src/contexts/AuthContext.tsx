@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { api } from '../services/api';
+import { api } from '@/lib/axios';
 import { toast } from 'react-hot-toast';
 import { storeService, type Store } from '../services/storeService';
 

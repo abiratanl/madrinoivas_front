@@ -1,5 +1,5 @@
 // src/services/storeService.ts
-import api from './api'; 
+import { api } from '@/lib/axios'; 
 
 // --- Interfaces ---
 
