@@ -12,7 +12,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // Aqui você pode injetar o token de autenticação automaticamente
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('@MadriNoivas:token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -27,9 +27,19 @@ api.interceptors.response.use(
   (error) => {
     // Comprehensive error handling
     if (error.response?.status === 401) {
+      // change-password legitimately returns 401 for a wrong current password;
+      // that must not clear the session
+      if (error.config?.url?.includes('/change-password')) {
+        return Promise.reject(error);
+      }
       // Ex: Redirect to login if token expires.
       console.error('Sessão expirada');
-      // window.location.href = '/login'; 
+      localStorage.removeItem('@MadriNoivas:token');
+      localStorage.removeItem('@MadriNoivas:user');
+      delete api.defaults.headers.common['Authorization'];
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

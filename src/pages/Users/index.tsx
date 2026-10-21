@@ -13,7 +13,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useUsers, type User } from "../../hooks/useUsers";
-import { api } from "../../services/api";
+import { api } from '@/lib/axios';
 import { cn } from "../../utils/cn";
 import { ConfirmModal } from "../../components/common/ConfirmModal";
 import { toast } from "react-hot-toast";

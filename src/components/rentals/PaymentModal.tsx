@@ -9,6 +9,7 @@ import {
   type PaymentType,
   type RentalInstallment,
 } from '../../services/paymentService';
+import { issueReceipt, issueReceiptForPrint } from '../../services/receiptService';
 import { cn } from '../../utils/cn';
 import { maskCurrency, numberToCurrencyInput, parseCurrency } from '../../utils/masks';
 
@@ -66,6 +67,7 @@ export function PaymentModal({
   const [installmentId, setInstallmentId] = useState('');
   const [notes, setNotes] = useState('');
   const [includePenalty, setIncludePenalty] = useState(true);
+  const [sendReceiptWhatsApp, setSendReceiptWhatsApp] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   // Remaining value of an installment; in edit mode the payment's own amount is
@@ -168,6 +170,7 @@ export function PaymentModal({
         setInstallmentId('');
         setNotes('');
         setIncludePenalty(true);
+        setSendReceiptWhatsApp(true);
       }
 
       try {
@@ -240,6 +243,35 @@ export function PaymentModal({
   const canSubmit =
     !loadingSummary && !submitting && !isAmountInvalid && !isInstallmentMissing && amountCeiling > 0;
 
+  // Issue the receipt for each newly created payment, following the modal's
+  // checkbox: WhatsApp delivery or a printable PDF opened in a new tab
+  const issueReceiptsFor = async (paymentIds: string[]) => {
+    for (const paymentId of paymentIds) {
+      try {
+        if (sendReceiptWhatsApp) {
+          const result = await issueReceipt(paymentId);
+          if (result.whatsappDeliveryStatus === 'failed') {
+            toast.error('Recibo emitido, mas não foi possível enviá-lo pelo WhatsApp.');
+          } else {
+            toast.success('Recibo emitido e enviado pelo WhatsApp!');
+          }
+        } else {
+          const blob = await issueReceiptForPrint(paymentId);
+          const url = URL.createObjectURL(blob);
+          const printWindow = window.open(url, '_blank');
+          if (printWindow) {
+            printWindow.onload = () => printWindow.print();
+          } else {
+            toast.error('Recibo gerado, mas o navegador bloqueou a janela de impressão.');
+          }
+        }
+      } catch (err) {
+        console.error('Error issuing receipt:', err);
+        toast.error('Pagamento registrado, mas houve erro ao emitir o recibo.');
+      }
+    }
+  };
+
   const handleSubmit = async () => {
     if (!rentalId || !canSubmit) return;
 
@@ -260,8 +292,9 @@ export function PaymentModal({
         // so it can be tracked separately in reports.
         const penaltyPart = chargePenalty ? Math.min(penaltyRemaining, numericAmount) : 0;
         const mainAmount = numericAmount - penaltyPart;
+        const createdPaymentIds: string[] = [];
         if (mainAmount > 0) {
-          await paymentService.create({
+          const created = await paymentService.create({
             rental_id: rentalId,
             installment_id: installmentId || null,
             amount: mainAmount,
@@ -269,10 +302,11 @@ export function PaymentModal({
             payment_method: paymentMethod,
             notes: notes.trim() || undefined,
           });
+          if (created?.data?.id) createdPaymentIds.push(created.data.id);
         }
         if (penaltyPart > 0) {
           try {
-            await paymentService.create({
+            const created = await paymentService.create({
               rental_id: rentalId,
               installment_id: penaltyInstallment?.id || null,
               amount: penaltyPart,
@@ -280,12 +314,14 @@ export function PaymentModal({
               payment_method: paymentMethod,
               notes: 'Multa por atraso',
             });
+            if (created?.data?.id) createdPaymentIds.push(created.data.id);
           } catch (penaltyErr) {
             console.error('Error registering penalty payment:', penaltyErr);
             toast.error('Pagamento registrado, mas houve erro ao lançar a multa. Registre-a separadamente.');
           }
         }
         toast.success('Pagamento registrado com sucesso!');
+        await issueReceiptsFor(createdPaymentIds);
       }
       onSuccess();
       onClose();
@@ -508,6 +544,19 @@ export function PaymentModal({
                       className="w-full px-4 py-3 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-rose-500 transition-all border border-gray-100 resize-none"
                     />
                   </div>
+
+                  {/* Receipt delivery: WhatsApp when checked, printable PDF otherwise */}
+                  {!isEditMode && (
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={sendReceiptWhatsApp}
+                        onChange={(e) => setSendReceiptWhatsApp(e.target.checked)}
+                        className="w-4 h-4 accent-rose-600 cursor-pointer"
+                      />
+                      Enviar recibo por WhatsApp
+                    </label>
+                  )}
                 </div>
               )}
             </>

@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, Fragment } from 'react';
-import { UserPlus, Search, Package, Calendar, Loader2, RotateCcw, Trash2, ChevronDown, ChevronRight, Truck, Undo2, Ban, User, Edit2, DollarSign, FileText } from 'lucide-react';
+import { UserPlus, Search, Package, Calendar, Loader2, RotateCcw, Trash2, ChevronDown, ChevronRight, Truck, Undo2, Ban, User, Edit2, DollarSign, FileText, Receipt } from 'lucide-react';
 import { useRentals } from '../../hooks/useRentals';
 import { rentalService } from '../../services/rentalService';
 import { paymentService, type Payment, type RentalInstallment } from '../../services/paymentService';
+import { issueReceipt } from '../../services/receiptService';
 import { RentalModal } from './components/RentalModal';
 import { ContractModal } from './components/ContractModal';
 import { ReturnModal } from '../../components/rentals/ReturnModal';
@@ -81,6 +82,31 @@ function ExpandedRowContent({
   // Load payment history so the financial summary reflects what was already paid.
   // Re-fetches whenever the cached details are invalidated (e.g. after a new payment).
   const [payments, setPayments] = useState<Payment[] | null>(null);
+  // Tracks which payment is currently having a receipt issued (per-row loading state)
+  const [receiptLoadingId, setReceiptLoadingId] = useState<string | null>(null);
+
+  // Issue a payment receipt and report the WhatsApp delivery outcome
+  const handleIssueReceipt = async (payment: Payment) => {
+    setReceiptLoadingId(payment.id);
+    try {
+      const result = await issueReceipt(payment.id);
+      if (result.whatsappDeliveryStatus === 'failed') {
+        toast.error(
+          'Recibo emitido, mas não foi possível enviá-lo pelo WhatsApp. Tente novamente mais tarde.'
+        );
+      } else {
+        toast.success('Recibo emitido e enviado pelo WhatsApp com sucesso!');
+      }
+    } catch (err) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Erro ao emitir o recibo. Tente novamente.';
+      toast.error(message);
+    } finally {
+      setReceiptLoadingId(null);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     setPayments(null);
@@ -361,6 +387,22 @@ function ExpandedRowContent({
                   </div>
                   {!isCancelled && canManagePayments && (
                     <div className="flex gap-1">
+                      {payment.status === 'confirmed' && (
+                        <StopPropagationButton
+                          onClick={() => handleIssueReceipt(payment)}
+                          title="Enviar Recibo"
+                          className={cn(
+                            'p-2 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-all active:scale-90',
+                            receiptLoadingId === payment.id && 'opacity-50 cursor-wait'
+                          )}
+                        >
+                          {receiptLoadingId === payment.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Receipt className="w-4 h-4" />
+                          )}
+                        </StopPropagationButton>
+                      )}
                       <StopPropagationButton
                         onClick={() => onEditPayment(payment)}
                         title="Editar Pagamento"
