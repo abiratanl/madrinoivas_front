@@ -19,8 +19,19 @@ export interface IssueReceiptResponse {
 
 // POST /payments/:id/receipt - Issue a payment receipt (PDF, signature, WhatsApp delivery)
 export async function issueReceipt(paymentId: string): Promise<IssueReceiptResponse> {
-  const response = await api.post(`/payments/${paymentId}/receipt`);
+  const response = await api.post(`/payments/${paymentId}/receipt`, { sendWhatsApp: true });
   return response.data?.data || response.data;
+}
+
+// POST /payments/:id/receipt (sendWhatsApp: false) - Issue the receipt and get
+// the signed PDF back for printing instead of WhatsApp delivery
+export async function issueReceiptForPrint(paymentId: string): Promise<Blob> {
+  const response = await api.post(
+    `/payments/${paymentId}/receipt`,
+    { sendWhatsApp: false },
+    { responseType: 'blob' },
+  );
+  return response.data;
 }
 
 // GET /payments/:id/receipts - List receipts issued for a payment
