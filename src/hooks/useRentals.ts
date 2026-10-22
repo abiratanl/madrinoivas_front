@@ -9,6 +9,7 @@ export interface RentalFormData {
   customer_id: string | '';
   start_date: string;
   end_date_scheduled: string;
+  fitting_date: string; // datetime-local format (YYYY-MM-DDTHH:mm), '' when not set
   products: RentalProductItem[];
   status: 'budget' | 'reserved';
   discount?: number;
@@ -20,12 +21,20 @@ const initialFormState: RentalFormData = {
   customer_id: '',
   start_date: new Date().toISOString().split('T')[0],
   end_date_scheduled: '',
+  fitting_date: '',
   products: [],
   status: 'budget',
   discount: 0,
   penalty_fee: 0,
   notes: '',
 };
+
+// Converts an ISO datetime from the API to the datetime-local input format (YYYY-MM-DDTHH:mm)
+const isoToDateTimeLocal = (iso?: string | null): string => (iso ? iso.slice(0, 16) : '');
+
+// Fitting date must not be after the pickup date (same day is allowed; compared by day)
+export const isFittingDateInvalid = (fittingDate: string, startDate: string): boolean =>
+  !!fittingDate && !!startDate && fittingDate.slice(0, 10) > startDate.slice(0, 10);
 
 export function useRentals() {
   const { selectedStore, user } = useAuth();
@@ -78,14 +87,12 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
         ...filters, 
         storeId: selectedStore?.id 
       });
-      console.log('loadRentals: customersRef.current.length =', customersRef.current.length);
       // Carrega apenas o resumo - detalhes serão carregados sob demanda
       let normalized = Array.isArray(data) ? data.map((r: any) => {
         // API não retorna customer_id, então buscamos por nome
-        const customer = customersRef.current.find(c => 
+        const customer = customersRef.current.find(c =>
           c.name.toLowerCase().trim() === (r.customer_name || '').toLowerCase().trim()
         );
-        console.log('Rental:', r.id, 'customer_name:', r.customer_name, 'found customer:', customer?.name, 'cpf:', customer?.cpf);
         const baseRental = {
           ...r,
           total_price: parseFloat(r.total_amount || '0'),
@@ -107,7 +114,6 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
         normalized = normalized.filter(r => r.status !== 'cancelled' && r.status !== 'returned');
       }
       
-      console.log('Normalized rentals sample:', normalized.slice(0, 2));
       setRentals(normalized);
     } catch (error) {
       toast.error('Erro ao carregar aluguéis');
@@ -300,6 +306,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
         customer_id: rental.customer_id || '',
         start_date: rental.start_date?.split('T')[0] || '',
         end_date_scheduled: rental.end_date_scheduled?.split('T')[0] || '',
+        fitting_date: isoToDateTimeLocal(rental.fitting_date),
         products: loadedProducts,
         status: rental.status === 'reserved' ? 'reserved' : 'budget',
         discount: rental.discount || 0,
@@ -358,7 +365,10 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
 
   const validateStep1 = () => formData.customer_id !== '';
   const validateStep2 = () => formData.products.length > 0;
-  const validateStep3 = () => !!formData.start_date && !!formData.end_date_scheduled;
+  const validateStep3 = () =>
+    !!formData.start_date &&
+    !!formData.end_date_scheduled &&
+    !isFittingDateInvalid(formData.fitting_date, formData.start_date);
 
   const handleNextStep = () => {
     if (currentStep === 1 && !validateStep1()) {
@@ -405,6 +415,8 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       customer_id: formData.customer_id,
       start_date: formData.start_date,
       end_date_scheduled: formData.end_date_scheduled,
+      // Send full ISO string, or null to clear the fitting date
+      fitting_date: formData.fitting_date ? new Date(formData.fitting_date).toISOString() : null,
       status: formData.status,
       store_id: String(storeId),
       discount: parseFloat(String(formData.discount || 0)),
@@ -425,6 +437,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       delete payload.products;
       delete payload.start_date;
       delete payload.end_date_scheduled;
+      delete payload.fitting_date;
       delete payload.status;
     }
 

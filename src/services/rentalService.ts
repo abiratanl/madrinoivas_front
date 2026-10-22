@@ -17,6 +17,7 @@ export interface CreateRentalDTO {
   customer_id: string;
   start_date?: string;      // Formato ISO ou YYYY-MM-DD
   end_date_scheduled?: string;
+  fitting_date?: string | null; // Data/hora da prova (ISO 8601, opcional)
   products?: RentalProductItem[]; // Array de produtos (opcional para update)
   installments_config?: any;     // Configuração de parcelamento (se houver)
   store_id?: string;             // Opcional (backend pega do token se for vendedor)
@@ -38,6 +39,8 @@ export interface Rental {
   total_amount?: string | number; // Campo alternativo que pode vir do backend
   start_date: string;
   end_date_scheduled: string;
+  fitting_date?: string | null; // Data/hora da prova (ISO 8601, opcional)
+  created_at?: string;
   items?: any[]; // Itens populados se o backend retornar
   customer?: {
     id: string;

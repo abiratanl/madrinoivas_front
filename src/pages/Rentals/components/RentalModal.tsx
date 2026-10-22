@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, User, Package, Calendar, ChevronLeft, Trash2, Plus, Minus, Search } from 'lucide-react';
+import { X, Check, User, Package, Calendar, ChevronLeft, Trash2, Plus, Minus, Search, Clock } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { Customer } from '../../../types/customer';
 import type { Product } from '../../../services/productService';
 import type { RentalProductItem } from '../../../services/rentalService';
+import { isFittingDateInvalid } from '../../../hooks/useRentals';
 import { DayPicker } from 'react-day-picker';
 import { format, parse, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -20,6 +21,7 @@ interface RentalModalProps {
     customer_id: string | '';
     start_date: string;
     end_date_scheduled: string;
+    fitting_date: string;
     products: RentalProductItem[];
     status: 'budget' | 'reserved';
     discount?: number;
@@ -138,9 +140,194 @@ function DatePickerBR({
   );
 }
 
+// Date+Time Picker for the fitting appointment: dd/mm/yyyy date with calendar
+// plus a 24h time selected by mouse/touch (hour/minute columns). The value
+// stays in the naive local format 'YYYY-MM-DDTHH:mm' ('' when unset) — the
+// native datetime-local input is not used because its display format depends
+// on the browser locale (mm/dd/yyyy, AM/PM), which we cannot control.
+function DateTimePickerBR({
+  value,
+  onChange,
+  label,
+  invalid = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  invalid?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isTimeOpen, setIsTimeOpen] = useState(false);
+  const [pendingTime, setPendingTime] = useState('');
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const dateISO = value ? value.slice(0, 10) : '';
+  const timeHHmm = value && value.length >= 16 ? value.slice(11, 16) : '';
+  const displayTime = timeHHmm || pendingTime;
+  const selectedHour = displayTime ? displayTime.slice(0, 2) : '';
+  const selectedMinute = displayTime ? displayTime.slice(3, 5) : '';
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+
+  const parseBRDate = (str: string): Date | null => {
+    const parsed = parse(str, 'dd/MM/yyyy', new Date());
+    return isValid(parsed) ? parsed : null;
+  };
+
+  const parseISODate = (str: string): Date | null => {
+    const parsed = parse(str, 'yyyy-MM-dd', new Date());
+    return isValid(parsed) ? parsed : null;
+  };
+
+  const formatBRDate = (date: Date): string => format(date, 'dd/MM/yyyy', { locale: ptBR });
+  const formatISODate = (date: Date): string => format(date, 'yyyy-MM-dd');
+
+  const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+  const emit = (date: string, time: string) => {
+    if (!date) {
+      onChange('');
+      return;
+    }
+    onChange(`${date}T${TIME_REGEX.test(time) ? time : '09:00'}`);
+  };
+
+  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length > 2) val = val.slice(0, 2) + '/' + val.slice(2);
+    if (val.length > 5) val = val.slice(0, 5) + '/' + val.slice(5);
+    e.target.value = val;
+    const date = parseBRDate(val);
+    if (date) emit(formatISODate(date), displayTime);
+    else if (val === '') onChange('');
+  };
+
+  const handleDateBlur = () => {
+    if (dateInputRef.current?.value) {
+      const date = parseBRDate(dateInputRef.current.value);
+      if (date) dateInputRef.current.value = formatBRDate(date);
+      else { dateInputRef.current.value = ''; onChange(''); }
+    }
+    setIsOpen(false);
+  };
+
+  const handleDayClick = (day: Date | undefined) => {
+    if (!day) return;
+    emit(formatISODate(day), displayTime);
+    setIsOpen(false);
+    dateInputRef.current?.blur();
+  };
+
+  const pickHour = (hour: string) => {
+    const time = `${hour}:${selectedMinute || '00'}`;
+    setPendingTime(time);
+    if (dateISO) emit(dateISO, time);
+  };
+
+  const pickMinute = (minute: string) => {
+    const time = `${selectedHour || '09'}:${minute}`;
+    setPendingTime(time);
+    if (dateISO) emit(dateISO, time);
+    setIsTimeOpen(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setIsTimeOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const borderClass = invalid ? 'border-red-500' : 'border-gray-200';
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">{label}</label>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <input
+            ref={dateInputRef}
+            type="text"
+            placeholder="dd/mm/aaaa"
+            maxLength={10}
+            className={cn(
+              'w-full px-4 py-2.5 rounded-lg border outline-none focus:ring-2 focus:ring-rose-500 pr-12',
+              borderClass
+            )}
+            value={dateISO ? formatBRDate(parseISODate(dateISO)!) : ''}
+            onChange={handleDateInputChange}
+            onFocus={() => { setIsOpen(true); setIsTimeOpen(false); }}
+            onBlur={handleDateBlur}
+          />
+          <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600" onClick={(e) => { e.preventDefault(); setIsOpen(!isOpen); setIsTimeOpen(false); }} tabIndex={-1}>
+            <Calendar className="w-5 h-5" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setIsTimeOpen(!isTimeOpen); setIsOpen(false); }}
+          className={cn(
+            'w-24 px-4 py-2.5 rounded-lg border outline-none focus:ring-2 focus:ring-rose-500 flex items-center justify-center gap-1 bg-white',
+            borderClass,
+            displayTime ? 'text-gray-900' : 'text-gray-400'
+          )}
+        >
+          <Clock className="w-4 h-4 shrink-0" />
+          {displayTime || '--:--'}
+        </button>
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-2">
+          <DayPicker mode="single" selected={dateISO ? parseISODate(dateISO) || undefined : undefined} onSelect={handleDayClick} locale={ptBR} required={false} />
+        </div>
+      )}
+      {isTimeOpen && (
+        <div className="absolute z-50 right-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-200 p-2 flex gap-1">
+          <div className="max-h-48 overflow-y-auto w-16 text-center">
+            {HOURS.map((h) => (
+              <button
+                key={h}
+                type="button"
+                onClick={() => pickHour(h)}
+                className={cn(
+                  'block w-full px-2 py-1.5 rounded-md text-sm hover:bg-rose-50',
+                  h === selectedHour ? 'bg-rose-500 text-white hover:bg-rose-500 font-bold' : 'text-gray-700'
+                )}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+          <div className="max-h-48 overflow-y-auto w-16 text-center border-l border-gray-100">
+            {MINUTES.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => pickMinute(m)}
+                className={cn(
+                  'block w-full px-2 py-1.5 rounded-md text-sm hover:bg-rose-50',
+                  m === selectedMinute ? 'bg-rose-500 text-white hover:bg-rose-500 font-bold' : 'text-gray-700'
+                )}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Stable custom input component for NumericFormat - defined outside to maintain referential equality
-function NumericFormatCustomInput({ inputRef, onChange, onFocus, onBlur, required, placeholder, className, ...rest }: React.InputHTMLAttributes<HTMLInputElement> & { 
-  inputRef: React.Ref<HTMLInputElement>; 
+function NumericFormatCustomInput({ inputRef, onChange, onFocus, onBlur, required, placeholder, className, ...rest }: React.InputHTMLAttributes<HTMLInputElement> & {
+  inputRef: React.Ref<HTMLInputElement>;
   onChange: React.ChangeEventHandler<HTMLInputElement>; 
   onFocus: React.FocusEventHandler<HTMLInputElement>; 
   onBlur: React.FocusEventHandler<HTMLInputElement>; 
@@ -249,6 +436,8 @@ export function RentalModal({
   const calculateTotal = () => {
     return calculateSubtotal() - (formData.discount || 0);
   };
+
+  const fittingDateInvalid = isFittingDateInvalid(formData.fitting_date, formData.start_date);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -491,6 +680,23 @@ export function RentalModal({
                 </div>
               </div>
 
+              {/* Data/Hora da Prova (opcional) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <DateTimePickerBR
+                    label="Data/Hora da Prova (opcional)"
+                    value={formData.fitting_date}
+                    onChange={(v) => setFormData({ ...formData, fitting_date: v })}
+                    invalid={fittingDateInvalid}
+                  />
+                  {fittingDateInvalid && (
+                    <p className="text-red-600 text-xs mt-1 font-medium">
+                      A data da prova deve ser anterior ou igual à data de retirada.
+                    </p>
+                  )}
+                </div>
+              </div>
+
               {/* Status, Desconto e Multa na mesma linha */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
@@ -553,6 +759,14 @@ export function RentalModal({
                       {formData.end_date_scheduled ? new Date(formData.end_date_scheduled).toLocaleDateString('pt-BR') : '-'}
                     </span>
                   </div>
+                  {formData.fitting_date && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Prova:</span>
+                      <span className="font-medium">
+                        {format(new Date(formData.fitting_date), 'dd/MM/yyyy HH:mm')}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal:</span>
                     <span className="font-medium">{formatPrice(calculateSubtotal())}</span>

@@ -628,15 +628,13 @@ export default function Rentals() {
   };
 
   const handleRowClick = async (id: string) => {
-    console.log('🔍 handleRowClick id:', id, 'expandedRow:', expandedRow);
     if (expandedRow === id) {
       setExpandedRow(null);
       return;
     }
-    
+
     // Caso contrário, carrega detalhes primeiro
     // O loadRentalDetails já verifica o cache internamente
-    console.log('🔍 Loading details');
     setExpandingRow(id);
     await loadRentalDetails(id);
     setExpandingRow(null);
@@ -659,8 +657,7 @@ export default function Rentals() {
     
     // Validar status antes de executar ações
     const rental = allRentals.find(r => r.id === confirmRentalId);
-    console.log('handleConfirmAction:', { confirmAction, confirmRentalId, rental: rental?.status, allRentalsCount: allRentals.length });
-    
+
     // 'return' is now handled by ReturnModal
     if (confirmAction === 'cancel') {
       if (rental && !canCancel(rental.status)) {
