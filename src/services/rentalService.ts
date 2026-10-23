@@ -136,21 +136,27 @@ export const rentalService = {
     return response.data;
   },
 
-  // POST /:id/contract/send-email - Enviar contrato por email
+  // POST /contracts/:id/send-email - Enviar contrato por email (id = contractId)
   sendContractEmail: async (id: string, data: { email: string }) => {
-    const response = await api.post(`/rentals/${id}/contract/send-email`, data);
+    const response = await api.post(`/contracts/${id}/send-email`, data);
     return response.data;
   },
 
-  // POST /:id/contract/send-whatsapp - Enviar contrato por WhatsApp
+  // POST /contracts/:id/send-whatsapp - Enviar contrato por WhatsApp (id = contractId)
   sendContractWhatsApp: async (id: string, data: { phone: string }) => {
-    const response = await api.post(`/rentals/${id}/contract/send-whatsapp`, data);
+    const response = await api.post(`/contracts/${id}/send-whatsapp`, data);
     return response.data;
   },
 
   // GET /:id/contract/pdf - Baixar PDF do contrato
   getContractPdf: async (id: string) => {
     const response = await api.get(`/rentals/${id}/contract/pdf`, { responseType: 'blob' });
+    return response.data;
+  },
+
+  // GET /contracts/:id/pdf - Baixar PDF de um contrato já gerado (id = contractId)
+  getContractPdfById: async (id: string) => {
+    const response = await api.get(`/contracts/${id}/pdf`, { responseType: 'blob' });
     return response.data;
   },
 };

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { ContractPreview } from './ContractPreview';
 import { SignaturePad } from './SignaturePad';
+import { rentalService } from '../../../services/rentalService';
 import type { Rental } from '../../../services/rentalService';
 import type { Customer } from '../../../types/customer';
 import type { Product } from '../../../services/productService';
@@ -48,7 +49,6 @@ export function ContractModal({
   const [step, setStep] = useState<ModalStep>('preview');
   const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
   const [contractId, setContractId] = useState<string | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handlePrint = useCallback(() => {
@@ -79,7 +79,6 @@ export function ContractModal({
     try {
       const result = await onGenerateContract(rental.id, signatureBase64);
       setContractId(result.contractId);
-      setPdfUrl(result.pdfUrl);
       setStep('done');
       toast.success('Contrato gerado e assinado com sucesso!');
     } catch (err: any) {
@@ -90,14 +89,24 @@ export function ContractModal({
     }
   }, [rental, signatureBase64, onGenerateContract]);
 
-  const handleDownload = useCallback(() => {
-    if (pdfUrl) {
+  const handleDownload = useCallback(async () => {
+    if (!contractId) return;
+    setLoading(true);
+    try {
+      // Authenticated fetch: a plain <a href> would not send the Bearer token
+      const blob = await rentalService.getContractPdfById(contractId);
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
       const link = document.createElement('a');
-      link.href = pdfUrl;
+      link.href = url;
       link.download = `contrato-${rental?.id?.slice(0, 8)}.pdf`;
       link.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Erro ao baixar o PDF do contrato');
+    } finally {
+      setLoading(false);
     }
-  }, [pdfUrl, rental]);
+  }, [contractId, rental]);
 
   const handleSendEmail = useCallback(async () => {
     if (!contractId || !customer?.email) {
@@ -139,7 +148,6 @@ export function ContractModal({
     setStep('preview');
     setSignatureBase64(null);
     setContractId(null);
-    setPdfUrl(null);
   }, []);
 
   if (!isOpen || !rental) return null;
