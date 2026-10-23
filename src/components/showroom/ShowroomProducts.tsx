@@ -3,6 +3,7 @@ import { Heart, X, Check, Search, ShoppingBag, MessageCircle, ChevronLeft, Tag }
 import { productService, type Product } from '../../services/productService';
 import { categoryService, type Category } from '../../services/categoryService';
 import { collectionService, type Collection } from '../../services/collectionService';
+import { getStoreMainPhone } from '../../services/storeService';
 import { cn } from '../../utils/cn';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '@/lib/axios';
@@ -53,7 +54,7 @@ export function ShowroomProducts({ selectedStoreId }: ShowroomProductsProps) {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = response.data.data || response.data;
-      const phone = data?.phone || data?.whatsapp;
+      const phone = getStoreMainPhone(data);
       if (phone) setStorePhone(phone);
     } catch (error: any) {
       console.error('Erro ao buscar telefone da loja:', error);

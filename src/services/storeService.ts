@@ -17,33 +17,61 @@ export interface StoreAddress {
   is_default?: boolean;
 }
 
+// Must match the `type` ENUM of the contacts table on the backend
+export type StoreContactType = 'mobile' | 'whatsapp' | 'landline' | 'email' | 'instagram' | 'facebook';
+
+export interface StoreContact {
+  id?: string;
+  store_id?: string;
+  type: StoreContactType;
+  value: string;
+  is_primary?: boolean | number;
+}
+
+export const STORE_PHONE_CONTACT_TYPES: StoreContactType[] = ['whatsapp', 'mobile', 'landline'];
+
+// Pick the store's main phone-like contact (primary first)
+export function getStoreMainPhone(store?: Pick<Store, 'contacts'> | null): string | null {
+  const contact = (store?.contacts || [])
+    .filter((c) => STORE_PHONE_CONTACT_TYPES.includes(c.type))
+    .sort((a, b) => Number(b.is_primary || 0) - Number(a.is_primary || 0))[0];
+  return contact?.value || null;
+}
+
+// Pick the store's main email contact (primary first)
+export function getStoreMainEmail(store?: Pick<Store, 'contacts'> | null): string | null {
+  const contact = (store?.contacts || [])
+    .filter((c) => c.type === 'email')
+    .sort((a, b) => Number(b.is_primary || 0) - Number(a.is_primary || 0))[0];
+  return contact?.value || null;
+}
+
 export interface Store {
   id: string; 
   name: string;
   address: string | null; // formatted address from backend join
   address_id: string | null; // raw FK
-  phone: string | null;
   city: string | null;
   state: string | null;
   cnpj: string | null;
-  email: string | null;
   digital_signature_base64?: string | undefined;
   is_active: boolean | number;
   created_at: string;
   updated_at: string;
   addresses?: StoreAddress[];
+  contacts?: StoreContact[];
 }
 
 export interface CreateStoreDTO {
   name: string;
-  phone?: string | null;
   addresses?: StoreAddress[];
+  contacts?: StoreContact[];
 }
 
 export interface UpdateStoreDTO {
   name?: string;
-  phone?: string | null;
   addresses?: StoreAddress[];
+  contacts?: StoreContact[];
   is_active?: boolean;
 }
 

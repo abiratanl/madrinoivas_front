@@ -1,6 +1,7 @@
 import { Building2, Check } from 'lucide-react';
 import { cn } from '../utils/cn';
 import type { Store } from '../services/storeService';
+import { getStoreMainPhone } from '../services/storeService';
 
 interface StoreSelectorProps {
   stores: Store[];
@@ -50,7 +51,7 @@ export function StoreSelector({ stores, selectedStore, onSelect, onClose }: Stor
                   <div>
                     <p className="font-semibold text-gray-900">{store.name}</p>
                     {store.address && <p className="text-sm text-gray-500">{store.address}</p>}
-                    {store.phone && <p className="text-xs text-gray-400">{store.phone}</p>}
+                    {getStoreMainPhone(store) && <p className="text-xs text-gray-400">{getStoreMainPhone(store)}</p>}
                   </div>
                 </div>
                 {selectedStore?.id === store.id && (

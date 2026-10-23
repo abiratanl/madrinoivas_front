@@ -3,15 +3,26 @@ import { X, Check, Phone, MapPin, Plus, Trash } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { maskPhone, maskCEP } from '../../../utils/masks';
 import { BRAZILIAN_STATES } from '../../../constants/brazilianStates';
-import type { StoreAddress } from '../../../services/storeService';
+import type { StoreAddress, StoreContact, StoreContactType } from '../../../services/storeService';
 
 interface StoreFormData {
   id: string; 
   name: string;
-  phone: string;
   is_active: boolean;
   addresses: StoreAddress[];
+  contacts: StoreContact[];
 }
+
+const CONTACT_TYPE_OPTIONS: Array<{ value: StoreContactType; label: string }> = [
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'mobile', label: 'Celular' },
+  { value: 'landline', label: 'Telefone Fixo' },
+  { value: 'email', label: 'E-mail' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'facebook', label: 'Facebook' },
+];
+
+const PHONE_LIKE_TYPES: StoreContactType[] = ['whatsapp', 'mobile', 'landline'];
 
 interface StoreModalProps {
   isOpen: boolean;
@@ -60,6 +71,32 @@ export function StoreModal({
   const handleClose = () => {
     setCurrentStep(1);
     onClose();
+  };
+
+  const updateContact = (index: number, changes: Partial<StoreContact>) => {
+    const newContacts = [...(formData.contacts || [])];
+    newContacts[index] = { ...newContacts[index], ...changes };
+    setFormData({ ...formData, contacts: newContacts });
+  };
+
+  const addContact = () => {
+    setFormData({
+      ...formData,
+      contacts: [...(formData.contacts || []), { type: 'whatsapp', value: '', is_primary: false }],
+    });
+  };
+
+  const removeContact = (index: number) => {
+    const newContacts = (formData.contacts || []).filter((_, i) => i !== index);
+    setFormData({ ...formData, contacts: newContacts });
+  };
+
+  const setPrimaryContact = (index: number) => {
+    const newContacts = (formData.contacts || []).map((contact, i) => ({
+      ...contact,
+      is_primary: i === index,
+    }));
+    setFormData({ ...formData, contacts: newContacts });
   };
 
   const isStep1Valid = () => {
@@ -124,11 +161,67 @@ export function StoreModal({
                 <label className="text-xs font-bold text-gray-500 uppercase">Nome da Loja</label>
                 <input required type="text" className="w-full mt-1 px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Ex: Madri Noivas - Centro" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Telefone</label>
-                  <input type="tel" className="w-full mt-1 px-4 py-2.5 rounded-lg border border-gray-200 outline-none" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: maskPhone(e.target.value) })} placeholder="(00) 0000-0000" />
+              {/* SEÇÃO DE CONTATOS */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-rose-500" /> Contatos
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={addContact}
+                    className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full border-2 bg-rose-50 border-rose-200 text-rose-700 hover:border-rose-400 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Adicionar
+                  </button>
                 </div>
+
+                {(formData.contacts || []).map((contact, index) => (
+                  <div key={index} className="flex items-end gap-2">
+                    <div className="w-32">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">Tipo</label>
+                      <select
+                        className="w-full mt-1 px-2 py-2 rounded-lg border border-gray-200 outline-none bg-gray-50"
+                        value={contact.type}
+                        onChange={e => updateContact(index, { type: e.target.value as StoreContactType })}
+                      >
+                        {CONTACT_TYPE_OPTIONS.map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">Contato</label>
+                      <input
+                        type="text"
+                        className="w-full mt-1 px-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500"
+                        value={contact.value || ''}
+                        onChange={e => updateContact(index, {
+                          value: PHONE_LIKE_TYPES.includes(contact.type) ? maskPhone(e.target.value) : e.target.value,
+                        })}
+                        placeholder={PHONE_LIKE_TYPES.includes(contact.type) ? '(00) 0000-0000' : 'Informe o contato'}
+                      />
+                    </div>
+                    <label className="flex items-center gap-1.5 pb-2 text-[10px] font-bold text-gray-400 uppercase cursor-pointer whitespace-nowrap">
+                      <input
+                        type="radio"
+                        name="primary-contact"
+                        className="accent-rose-600"
+                        checked={!!contact.is_primary}
+                        onChange={() => setPrimaryContact(index)}
+                      />
+                      Principal
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => removeContact(index)}
+                      title="Remover contato"
+                      className="p-2 mb-0.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}

@@ -4,6 +4,7 @@ import { useRentals } from '../../hooks/useRentals';
 import { rentalService } from '../../services/rentalService';
 import { paymentService, type Payment, type RentalInstallment } from '../../services/paymentService';
 import { issueReceipt } from '../../services/receiptService';
+import { getStoreMainPhone, getStoreMainEmail } from '../../services/storeService';
 import { RentalModal } from './components/RentalModal';
 import { ContractModal } from './components/ContractModal';
 import { ReturnModal } from '../../components/rentals/ReturnModal';
@@ -548,8 +549,8 @@ export default function Rentals() {
     city: selectedStore?.city || 'Cidade',
     state: selectedStore?.state || 'UF',
     cnpj: selectedStore?.cnpj || '00.000.000/0000-00',
-    phone: selectedStore?.phone || '(00) 0000-0000',
-    email: selectedStore?.email || 'contato@madrinoivas.com',
+    phone: getStoreMainPhone(selectedStore) || '(00) 0000-0000',
+    email: getStoreMainEmail(selectedStore) || 'contato@madrinoivas.com',
     digital_signature_base64: selectedStore?.digital_signature_base64,
   };
 

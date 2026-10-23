@@ -16,6 +16,7 @@ import { ConfirmModal } from "../../components/common/ConfirmModal";
 import { StoreModal } from "./components/StoreModal";
 import { toast } from "react-hot-toast";
 import type { Store } from "../../services/storeService";
+import { getStoreMainPhone } from "../../services/storeService";
 
 function Stores() {
   const {
@@ -202,7 +203,7 @@ function Stores() {
                         </div>
                         <div className="flex items-center gap-1.5 text-gray-500">
                           <Phone className="w-3.5 h-3.5" />
-                          <span>{store.phone || 'Telefone não cadastrado'}</span>
+                          <span>{getStoreMainPhone(store) || 'Telefone não cadastrado'}</span>
                         </div>
                       </div>
                     </td>

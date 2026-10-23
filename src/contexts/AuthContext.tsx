@@ -71,14 +71,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: 'Minha Loja',
           address: null,
           address_id: null,
-          phone: null,
           city: null,
           state: null,
           cnpj: null,
-          email: null,
           is_active: true,
           created_at: '',
           updated_at: '',
+          contacts: [],
         } as Store;
       }
       

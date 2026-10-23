@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { storeService, type Store, type CreateStoreDTO, type UpdateStoreDTO, type StoreAddress } from '../services/storeService';
+import { storeService, type Store, type CreateStoreDTO, type UpdateStoreDTO, type StoreAddress, type StoreContact } from '../services/storeService';
 
 interface StoreFormData {
   id: string; 
   name: string;
-  phone: string;
   is_active: boolean;
   addresses: StoreAddress[];
+  contacts: StoreContact[];
 }
 
 const emptyAddress: StoreAddress = {
@@ -22,6 +22,12 @@ const emptyAddress: StoreAddress = {
   is_default: true,
 };
 
+const emptyContact: StoreContact = {
+  type: 'whatsapp',
+  value: '',
+  is_primary: true,
+};
+
 export function useStores() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,9 +38,9 @@ export function useStores() {
   const [formData, setFormData] = useState<StoreFormData>({
     id: '', 
     name: '',
-    phone: '',
     is_active: true,
     addresses: [emptyAddress],
+    contacts: [emptyContact],
   });
 
   const loadStores = useCallback(async (showInactive = false) => {
@@ -54,17 +60,19 @@ export function useStores() {
     setFormData({
       id: String(store.id), 
       name: store.name,
-      phone: store.phone || '',
       is_active: store.is_active === true || store.is_active === 1,
       addresses: store.addresses && store.addresses.length > 0 
         ? store.addresses 
         : [emptyAddress],
+      contacts: store.contacts && store.contacts.length > 0
+        ? store.contacts
+        : [emptyContact],
     });
     setIsEditing(true);
   };
 
   const resetForm = () => {
-    setFormData({ id: '', name: '', phone: '', is_active: true, addresses: [emptyAddress] });
+    setFormData({ id: '', name: '', is_active: true, addresses: [emptyAddress], contacts: [emptyContact] });
     setIsEditing(false);
   };
 
@@ -80,18 +88,26 @@ export function useStores() {
         addr.zip_code || addr.street || addr.number || addr.city || addr.state
       );
 
+      // Filter out contacts without value and guarantee a single primary
+      const validContacts = formData.contacts
+        .filter(contact => contact.value?.trim())
+        .map(contact => ({ ...contact, value: contact.value.trim() }));
+      if (validContacts.length > 0 && !validContacts.some(contact => contact.is_primary)) {
+        validContacts[0].is_primary = true;
+      }
+
       if (isEditing && formData.id) {
         await storeService.update(formData.id, {
           name: formData.name,
-          phone: formData.phone || null,
           addresses: validAddresses,
+          contacts: validContacts,
         });
         alert('Loja atualizada com sucesso!');
       } else {
         await storeService.create({
           name: formData.name,
-          phone: formData.phone || null,
           addresses: validAddresses,
+          contacts: validContacts,
         });
         alert('Loja criada com sucesso!');
       }
@@ -125,4 +141,4 @@ export function useStores() {
   };
 }
 
-export type { Store, CreateStoreDTO, UpdateStoreDTO, StoreAddress };
+export type { Store, CreateStoreDTO, UpdateStoreDTO, StoreAddress, StoreContact };
