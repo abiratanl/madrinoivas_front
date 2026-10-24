@@ -243,7 +243,7 @@ export function StoreModal({
                     value={formData.addresses?.[0]?.type || 'commercial'}
                     onChange={e => {
                       const newA = [...(formData.addresses || [])];
-                      newA[0] = { ...newA[0], type: e.target.value as any };
+                      newA[0] = { ...newA[0], type: e.target.value as StoreAddress['type'] };
                       setFormData({ ...formData, addresses: newA });
                     }}
                   >

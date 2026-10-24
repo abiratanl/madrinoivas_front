@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { storeService, type Store, type CreateStoreDTO, type UpdateStoreDTO, type StoreAddress, type StoreContact } from '../services/storeService';
 
 interface StoreFormData {
@@ -49,7 +49,7 @@ export function useStores() {
       const response = await storeService.getAll(showInactive);
       const storeList = Array.isArray(response) ? response : (response.data || []);
       setStores(storeList);
-    } catch (err) {
+    } catch {
       setError('Não foi possível carregar a lista de lojas.');
     } finally {
       setLoading(false);
@@ -130,7 +130,7 @@ export function useStores() {
     try {
       await storeService.toggleActive(storeId);
       loadStores();
-    } catch (err) {
+    } catch {
       alert('Erro ao alterar status da loja.');
     }
   };

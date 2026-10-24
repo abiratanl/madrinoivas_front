@@ -4,6 +4,19 @@ import { ptBR } from 'date-fns/locale';
 import type { Rental } from '../../../services/rentalService';
 import type { Customer } from '../../../types/customer';
 import type { Product } from '../../../services/productService';
+import type { Payment } from '../../../services/paymentService';
+import { PAYMENT_METHOD_OPTIONS } from '../../../components/rentals/PaymentModal';
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = Object.fromEntries(
+  PAYMENT_METHOD_OPTIONS.map((o) => [o.value, o.label]),
+);
+
+// Lessor (Madri Noivas) legal identification, mirroring the backend contractService fallbacks
+const LESSOR_LEGAL_NAME = 'TERESA FRANCA DE OLIVEIRA FRANCISCO (ME)';
+const LESSOR_CNPJ = '07.846.246/0001-28';
+const LESSOR_REPRESENTATIVE = 'Teresa França de Oliveira Francisco';
+const CONTRACT_CITY = 'Guaratinguetá';
+const CONTRACT_STATE = 'SP';
 
 interface ContractPreviewProps {
   rental: Rental;
@@ -16,6 +29,7 @@ interface ContractPreviewProps {
     cnpj: string;
     phone: string;
     email: string;
+    owner_name?: string | null;
     digital_signature_base64?: string;
   };
   items: Array<{
@@ -23,6 +37,7 @@ interface ContractPreviewProps {
     quantity: number;
     unit_price: number;
   }>;
+  payments?: Payment[];
   onPrint: () => void;
   onSign: () => void;
   onDownload: () => void;
@@ -36,6 +51,44 @@ function formatCurrency(value: number) {
 
 function formatDate(dateStr: string) {
   return format(new Date(dateStr), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+}
+
+function formatDateTime(dateStr: string) {
+  return format(new Date(dateStr), "dd/MM/yyyy',' HH:mm", { locale: ptBR });
+}
+
+function formatAddressLine(address: {
+  street?: string;
+  number?: string;
+  complement?: string | null;
+  neighborhood?: string | null;
+}) {
+  const parts = [address.street, address.number ? `nº ${address.number}` : null];
+  if (address.complement) parts.push(address.complement);
+  if (address.neighborhood) parts.push(`- ${address.neighborhood}`);
+  return parts.filter(Boolean).join(' ');
+}
+
+// Pick the customer's default address (first as fallback)
+function getCustomerAddress(customer?: Customer) {
+  const addresses = customer?.addresses || [];
+  return addresses.find((a) => a.is_default) || addresses[0] || null;
+}
+
+// Pick the customer's main phone-like contact (primary first)
+function getCustomerPhone(customer?: Customer) {
+  const contact = (customer?.contacts || [])
+    .filter((c) => ['whatsapp', 'mobile', 'phone'].includes(c.type))
+    .sort((a, b) => Number(b.is_primary || 0) - Number(a.is_primary || 0))[0];
+  return contact?.value || customer?.main_phone || null;
+}
+
+// Pick the customer's main e-mail contact (primary first)
+function getCustomerEmail(customer?: Customer) {
+  const contact = (customer?.contacts || [])
+    .filter((c) => c.type === 'email')
+    .sort((a, b) => Number(b.is_primary || 0) - Number(a.is_primary || 0))[0];
+  return contact?.value || customer?.email || null;
 }
 
 function getItemDescription(item: ContractPreviewProps['items'][0]) {
@@ -53,6 +106,7 @@ export function ContractPreview({
   customer,
   store,
   items,
+  payments,
   onPrint,
   onSign,
   onDownload,
@@ -63,6 +117,38 @@ export function ContractPreview({
   const balanceDue = (rental.total_price || 0) - depositPaid;
   const extraDailyRate = rental.extra_daily_rate || rental.daily_rate || 0;
   const today = new Date();
+
+  const storeCity = store.city || CONTRACT_CITY;
+  const storeState = store.state || CONTRACT_STATE;
+
+  const customerAddress = getCustomerAddress(customer);
+  const lesseeAddressLine = customerAddress
+    ? [
+        formatAddressLine(customerAddress),
+        [customerAddress.city, customerAddress.state].filter(Boolean).join(' - '),
+        customerAddress.zip_code ? `CEP ${customerAddress.zip_code}` : null,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : null;
+  const lesseePhone = getCustomerPhone(customer);
+  const lesseeEmail = getCustomerEmail(customer);
+  const lesseeQualification = [
+    customer?.name || '________________________________________',
+    customer?.cpf ? `CPF nº ${customer.cpf}` : null,
+    customer?.rg ? `RG nº ${customer.rg}` : null,
+    lesseeAddressLine ? `residente e domiciliada(o) em ${lesseeAddressLine}` : null,
+    lesseePhone ? `telefone ${lesseePhone}` : null,
+    lesseeEmail ? `e-mail ${lesseeEmail}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  // Confirmed payments in chronological order, mirroring the PDF payment history
+  const confirmedPayments = (payments || [])
+    .filter((p) => p.status !== 'cancelled')
+    .slice()
+    .sort((a, b) => new Date(a.paid_at).getTime() - new Date(b.paid_at).getTime());
 
   return (
     <div className="contract-preview max-w-3xl mx-auto bg-white p-8 md:p-12 font-serif text-gray-900 leading-relaxed" style={{ fontFamily: 'Georgia, serif' }}>
@@ -77,6 +163,17 @@ export function ContractPreview({
       <div className="text-center mb-8">
         <h2 className="text-xl font-bold underline decoration-2 underline-offset-4 mb-2">CONTRATO DE LOCAÇÃO DE VESTUÁRIO E ACESSÓRIOS</h2>
         <p className="text-sm text-gray-500">Contrato Nº: <strong>{rental.id?.slice(0, 8).toUpperCase()}</strong></p>
+      </div>
+
+      {/* Qualificação das Partes */}
+      <div className="mb-6">
+        <h3 className="font-bold text-lg mb-3">Das Partes</h3>
+        <p className="text-sm mb-2">
+          <strong>LOCADORA:</strong> {LESSOR_LEGAL_NAME}, nome fantasia {store.name}, CNPJ nº {store.cnpj || LESSOR_CNPJ}, com sede em {store.address}, neste ato representada por {store.owner_name || LESSOR_REPRESENTATIVE}.
+        </p>
+        <p className="text-sm">
+          <strong>LOCATÁRIA(O):</strong> {lesseeQualification}.
+        </p>
       </div>
 
       {/* Cláusula 1 - Objeto */}
@@ -113,6 +210,18 @@ export function ContractPreview({
           <li><strong>Valor Total do Aluguel:</strong> {formatCurrency(rental.total_price || 0)}</li>
           <li><strong>Sinal de Reserva (não reembolsável em caso de desistência):</strong> {formatCurrency(depositPaid)}</li>
           <li><strong>Restante do pagamento:</strong> {formatCurrency(balanceDue)} — Deverá ser quitado no ato da retirada da peça.</li>
+          {confirmedPayments.length > 0 && (
+            <li>
+              <strong>Pagamentos registrados até a emissão deste contrato:</strong>
+              <ul className="ml-6 mt-1 space-y-1 list-none">
+                {confirmedPayments.map((payment) => (
+                  <li key={payment.id}>
+                    - {formatDateTime(payment.paid_at)} — {PAYMENT_METHOD_LABELS[payment.payment_method] || 'Outro'}: {formatCurrency(Number(payment.amount))}
+                  </li>
+                ))}
+              </ul>
+            </li>
+          )}
         </ul>
       </div>
 
@@ -138,7 +247,7 @@ export function ContractPreview({
       {/* Cláusula 6 - Foro */}
       <div className="mb-10">
         <h3 className="font-bold text-lg mb-3">Cláusula 6ª – Do Foro</h3>
-        <p className="text-sm">Fica eleito o foro da Comarca de <strong>{store.city} - {store.state}</strong> para dirimir quaisquer dúvidas decorrentes deste contrato.</p>
+        <p className="text-sm">Fica eleito o foro da Comarca de <strong>{storeCity} - {storeState}</strong> para dirimir quaisquer dúvidas decorrentes deste contrato.</p>
       </div>
 
       {/* Assinaturas */}
@@ -148,6 +257,7 @@ export function ContractPreview({
           <div className="border-t border-gray-400 pt-4">
             <p className="font-bold uppercase tracking-wider">LOCADORA</p>
             <p className="text-sm mt-2">{store.name}</p>
+            <p className="text-xs text-gray-500 mt-1">CNPJ: {store.cnpj || LESSOR_CNPJ}</p>
             {store.digital_signature_base64 && (
               <img src={`data:image/png;base64,${store.digital_signature_base64}`} alt="Assinatura Locadora" className="mx-auto mt-4 max-h-20" />
             )}
@@ -167,7 +277,7 @@ export function ContractPreview({
 
       {/* Data e Local */}
       <div className="text-center mt-10 text-sm">
-        <p>{store.city} - {store.state}, {format(today, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}.</p>
+        <p>{storeCity} - {storeState}, {format(today, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}.</p>
       </div>
 
       {/* Ações */}

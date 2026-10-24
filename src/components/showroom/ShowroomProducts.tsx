@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Heart, X, Check, Search, ShoppingBag, MessageCircle, ChevronLeft, Tag } from 'lucide-react';
+import { Heart, X, Check, Search, ShoppingBag, MessageCircle, ChevronLeft } from 'lucide-react';
 import { productService, type Product } from '../../services/productService';
 import { categoryService, type Category } from '../../services/categoryService';
 import { collectionService, type Collection } from '../../services/collectionService';
@@ -38,30 +38,7 @@ export function ShowroomProducts({ selectedStoreId }: ShowroomProductsProps) {
   const [tryOnList, setTryOnList] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  useEffect(() => {
-    loadData();
-    if (user?.store_id) {
-      loadStoreConfig();
-    }
-  }, [user, selectedStore?.id]);
-
-  async function loadStoreConfig() {
-    if (!user?.store_id) return;
-    try {
-      const token = localStorage.getItem('@MadriNoivas:token');
-      const cleanStoreId = String(user.store_id).trim();
-      const response = await api.get(`/stores/${cleanStoreId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = response.data.data || response.data;
-      const phone = getStoreMainPhone(data);
-      if (phone) setStorePhone(phone);
-    } catch (error: any) {
-      console.error('Erro ao buscar telefone da loja:', error);
-    }
-  }
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [prodData, catData, colData] = await Promise.all([
@@ -86,7 +63,30 @@ export function ShowroomProducts({ selectedStoreId }: ShowroomProductsProps) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [selectedStoreId, selectedStore?.id]);
+
+  const loadStoreConfig = useCallback(async () => {
+    if (!user?.store_id) return;
+    try {
+      const token = localStorage.getItem('@MadriNoivas:token');
+      const cleanStoreId = String(user.store_id).trim();
+      const response = await api.get(`/stores/${cleanStoreId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = response.data.data || response.data;
+      const phone = getStoreMainPhone(data);
+      if (phone) setStorePhone(phone);
+    } catch (error) {
+      console.error('Erro ao buscar telefone da loja:', error);
+    }
+  }, [user?.store_id]);
+
+  useEffect(() => {
+    loadData();
+    if (user?.store_id) {
+      loadStoreConfig();
+    }
+  }, [user?.store_id, loadData, loadStoreConfig]);
 
   const toggleTryOn = useCallback((e: React.MouseEvent, product: Product) => {
     e.stopPropagation();
@@ -249,7 +249,7 @@ export function ShowroomProducts({ selectedStoreId }: ShowroomProductsProps) {
             {tryOnList.map(p => (
               <div key={p.id} className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
                 <span className="text-[12px] truncate">{p.name} ({p.code})</span>
-                <button onClick={(e) => toggleTryOn(e as any, p)} className="text-gray-400 hover:text-rose-400">
+                <button onClick={(e) => toggleTryOn(e, p)} className="text-gray-400 hover:text-rose-400">
                   <X className="w-4 h-4" />
                 </button>
               </div>

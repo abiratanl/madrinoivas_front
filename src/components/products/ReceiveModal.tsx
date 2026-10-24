@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X, CheckCircle, Package, AlertCircle, Store as StoreIcon } from "lucide-react";
-import { productService, type Product, type ReceiveProductDTO, type ProductTransfer } from "../../services/productService";
+import { productService, type Product, type ReceiveProductDTO } from "../../services/productService";
 import { cn } from "../../utils/cn";
 import { toast } from "react-hot-toast";
 

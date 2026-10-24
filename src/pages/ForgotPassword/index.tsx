@@ -16,10 +16,11 @@ function ForgotPassword() {
       await authService.forgotPassword(email);
       setMessage({ type: 'success', text: 'Se o e-mail existir, você receberá um link em instantes.' });
       setEmail(""); 
-    } catch (error: any) {
+    } catch (error) {
+      const apiErr = error as { response?: { data?: { message?: string } } };
       setMessage({ 
         type: 'error', 
-        text: error.response?.data?.message || 'Erro ao enviar solicitação.' 
+        text: apiErr.response?.data?.message || 'Erro ao enviar solicitação.' 
       });
     } finally {
       setLoading(false);

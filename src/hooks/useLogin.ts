@@ -61,13 +61,18 @@ export function useLogin() {
                     navigate('/'); // <--- Mande para a raiz
             }
 
-        } catch (err: any) {
+        } catch (err) {
             console.error("❌ Erro no Login:", err);
+
+            const axiosErr = err as {
+                response?: { status?: number; data?: { code?: string; token?: string; message?: string } };
+                message?: string;
+            };
 
             // 4. Lógica de Troca de Senha Obrigatória
             // Se o backend retornar 403 com código específico, redireciona
-            if (err.response && err.response.status === 403) {
-                const { code, token } = err.response.data;
+            if (axiosErr.response && axiosErr.response.status === 403) {
+                const { code, token } = axiosErr.response.data || {};
                 
                 if (code === 'PASSWORD_CHANGE_REQUIRED') {
                     // Redireciona para troca de senha levando o token temporário
@@ -81,7 +86,7 @@ export function useLogin() {
             }
 
             // Tratamento de mensagem de erro genérica
-            const msg = err.response?.data?.message || err.message || 'Falha ao conectar com o servidor.';
+            const msg = axiosErr.response?.data?.message || axiosErr.message || 'Falha ao conectar com o servidor.';
             setError(msg);
         } finally {
             setLoading(false);

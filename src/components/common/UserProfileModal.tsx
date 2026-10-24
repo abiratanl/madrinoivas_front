@@ -11,7 +11,18 @@ interface UserProfileModalProps {
 }
 
 // Helper component to render input fields consistently
-const FormField = ({ label, id, type, value, onChange, placeholder, showPassword, togglePassword }: any) => (
+interface FormFieldProps {
+  label: string;
+  id: string;
+  type: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  showPassword?: boolean;
+  togglePassword?: () => void;
+}
+
+const FormField = ({ label, id, type, value, onChange, placeholder, showPassword, togglePassword }: FormFieldProps) => (
   <div className="relative">
     <label htmlFor={id} className="block text-xs font-bold text-gray-500 mb-1.5 tracking-wide">
       {label}
@@ -57,11 +68,11 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
       await authService.changePassword(passwords.current, passwords.new);
       toast.success("Senha alterada com sucesso!");
       handleClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro capturado:", error);
 
-
-      const message = error.response?.data?.message === 'Current password is incorrect.'
+      const apiErr = error as { response?: { data?: { message?: string } } };
+      const message = apiErr.response?.data?.message === 'Current password is incorrect.'
         ? 'A senha atual está incorreta.'
         : 'Ocorreu um erro ao atualizar a senha.';
 
@@ -79,10 +90,6 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
     setShowNew(false);
     setShowConfirm(false);
     onClose();
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
-    setPasswords(prev => ({ ...prev, [field]: e.target.value }));
   };
 
   return (
@@ -110,7 +117,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
             id="current" // Use IDs únicos
             type="password"
             value={passwords.current} // Valor específico deste campo
-            onChange={(e: any) => setPasswords({ ...passwords, current: e.target.value })}
+            onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
             showPassword={showCurrent}
             togglePassword={() => setShowCurrent(!showCurrent)}
           />
@@ -120,7 +127,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
             id="new"
             type="password"
             value={passwords.new} // Valor específico deste campo
-            onChange={(e: any) => setPasswords({ ...passwords, new: e.target.value })}
+            onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
             showPassword={showNew}
             togglePassword={() => setShowNew(!showNew)}
           />
@@ -130,7 +137,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
             id="confirm"
             type="password"
             value={passwords.confirm} // Valor específico deste campo
-            onChange={(e: any) => setPasswords({ ...passwords, confirm: e.target.value })}
+            onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
             showPassword={showConfirm}
             togglePassword={() => setShowConfirm(!showConfirm)}
           />

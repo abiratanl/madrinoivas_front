@@ -3,11 +3,10 @@ import React, { useRef, useEffect, useState } from 'react';
 interface SignaturePadProps {
   onSignatureComplete: (base64: string) => void;
   onClear: () => void;
-  width?: string | number;
   height?: number;
 }
 
-export function SignaturePad({ onSignatureComplete, onClear, width: _width = '100%', height = 200 }: SignaturePadProps) {
+export function SignaturePad({ onSignatureComplete, onClear, height = 200 }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);

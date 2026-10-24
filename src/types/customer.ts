@@ -32,7 +32,7 @@ export interface CustomerMeasurements {
   altura?: string;
   ombro_a_ombro?: string;
   comprimento_braco?: string;
-  [key: string]: any; // Permite campos extras se necessário
+  [key: string]: string | undefined; // Permite campos extras se necessário
 }
 
 // 4. Interface Principal (Baseado na tabela 'customers')

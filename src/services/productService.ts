@@ -207,9 +207,10 @@ export const productService = {
   getTransfers: async (productId?: number | string) => {
     const url = productId ? `/products/${productId}/transfers` : "/transfers";
     const response = await api.get(url);
-    const transfers = response.data.data || response.data || [];
+    const transfers: Array<ProductTransfer & { transfer_id?: string }> =
+      response.data.data || response.data || [];
     // Backend returns transfer_id as the transfer ID, map it to id for frontend interface
-    return transfers.map((t: any) => ({
+    return transfers.map((t) => ({
       ...t,
       id: t.transfer_id || t.id
     }));
@@ -226,19 +227,21 @@ export const productService = {
       const response = await api.get(`/transfers?${params.toString()}`);
       transfers = response.data.data || response.data || [];
       // Backend returns transfer_id as the transfer ID, map it to id for frontend interface
-      transfers = transfers.map((t: any) => ({ ...t, id: t.transfer_id || t.id }));
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { status?: number } };
+      transfers = transfers.map((t) => ({ ...t, id: (t as { transfer_id?: string }).transfer_id || t.id }));
+    } catch {
       // Fallback: fetch all transfers and filter locally
       try {
         const response = await api.get("/transfers");
-        const allTransfers = response.data.data || response.data || [];
+        const allTransfers: ProductTransfer[] = response.data.data || response.data || [];
         // Backend returns transfer_id as the transfer ID, map it to id for frontend interface
-        const mappedTransfers = allTransfers.map((t: any) => ({ ...t, id: t.transfer_id || t.id }));
+        const mappedTransfers = allTransfers.map((t) => ({
+          ...t,
+          id: (t as { transfer_id?: string }).transfer_id || t.id,
+        }));
         transfers = mappedTransfers.filter(
           (t: ProductTransfer) => String(t.to_store_id) === String(storeId) && t.status === "active"
         );
-      } catch (fallbackError) {
+      } catch {
         transfers = [];
       }
     }

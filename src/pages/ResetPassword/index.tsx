@@ -33,10 +33,11 @@ function ResetPassword() {
       
       setTimeout(() => navigate('/auth/login'), 3000);
       
-    } catch (error: any) {
+    } catch (error) {
+      const apiErr = error as { response?: { data?: { message?: string } } };
       setMessage({ 
         type: 'error', 
-        text: error.response?.data?.message || 'Token expirado ou inválido.' 
+        text: apiErr.response?.data?.message || 'Token expirado ou inválido.' 
       });
     } finally {
       setLoading(false);

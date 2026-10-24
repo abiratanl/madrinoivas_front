@@ -40,7 +40,7 @@ export function useCustomers() {
     // Passamos o objeto de filtros para o service
     const data = await customerService.getAll(search, includeInactives);
     setCustomers(data);
-  } catch (error) {
+  } catch {
     toast.error("Erro ao carregar dados.");
   } finally {
     setLoading(false);
@@ -91,7 +91,7 @@ export function useCustomers() {
       setFormData(fullCustomer);
       setIsEditing(true);
       toast.dismiss(loadToast);
-    } catch (err: any) {
+    } catch {
       toast.error('Erro ao carregar detalhes da cliente.', { id: loadToast });
     }
   };
@@ -123,7 +123,7 @@ export function useCustomers() {
       toast.success('Cliente removido com sucesso!');
       return true;
     }
-  } catch (err) {
+  } catch {
     toast.error('Erro ao excluir cliente.');
     return false;
   }
@@ -151,8 +151,9 @@ export function useCustomers() {
     
     return true; 
     
-  } catch (err: any) {
-    const errorMessage = err.response?.data?.message || 'Erro ao salvar.';
+  } catch (err) {
+    const apiError = err as { response?: { data?: { message?: string } } };
+    const errorMessage = apiError.response?.data?.message || 'Erro ao salvar.';
     toast.error(errorMessage, { id: loadingToast });
     return false; 
   }

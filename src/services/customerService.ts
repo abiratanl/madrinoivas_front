@@ -5,17 +5,17 @@ export const customerService = {
   // 1. LISTAR CLIENTES (Usa a busca por Nome/CPF que você criou no Model)
   getAll: async (search?: string, includeInactives: boolean = false): Promise<Customer[]> => {
     // Montamos os parâmetros de consulta para a URL
-    const params: any = {};
+    const params: Record<string, string | boolean> = {};
     if (search) params.search = search;
     if (includeInactives) params.includeInactives = true; // Enviado como query string
     
     // Faz a chamada à API: /customers?search=...&includeInactives=true
     const response = await api.get('/customers', { params });
     
-    const rawData = response.data.data || [];
+    const rawData: Customer[] = response.data.data || [];
     
     // Mantemos a conversão de 0/1 para boolean para evitar erros no TS
-    return rawData.map((customer: any) => ({
+    return rawData.map((customer) => ({
       ...customer,
       is_active: !!customer.is_active
     }));

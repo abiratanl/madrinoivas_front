@@ -48,13 +48,3 @@ export function useContract() {
     downloadContractPdf,
   };
 }
-
-// Extend rentalService with contract methods
-declare module '../../../services/rentalService' {
-  interface RentalService {
-    generateContract: (id: string, data: { lessee_signature: string }) => Promise<any>;
-    sendContractEmail: (id: string, data: { email: string }) => Promise<any>;
-    sendContractWhatsApp: (id: string, data: { phone: string }) => Promise<any>;
-    getContractPdf: (id: string) => Promise<Blob>;
-  }
-}

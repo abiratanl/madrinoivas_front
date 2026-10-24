@@ -5,7 +5,6 @@ import {
   Building2,
   MapPin,
   Phone,
-  X,
   Filter,
   ToggleLeft,
   ToggleRight,
@@ -55,7 +54,7 @@ function Stores() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleToggleStatusClick = (store: any) => {
+  const handleToggleStatusClick = (store: Store) => {
     const isActive = store.is_active === true || store.is_active === 1;
     setConfirmAction(isActive ? 'deactivate' : 'activate');
     setConfirmStoreId(String(store.id));
@@ -76,7 +75,7 @@ function Stores() {
       if (confirmAction === 'activate') {
         setShowInactive(false);
       }
-    } catch (err) {
+    } catch {
       toast.error('Erro ao alterar status da loja');
     } finally {
       setIsConfirmOpen(false);

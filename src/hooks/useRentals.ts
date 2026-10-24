@@ -1,9 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { rentalService, type CreateRentalDTO, type Rental, type RentalProductItem } from '../services/rentalService';
+import { rentalService, type CreateRentalDTO, type Rental, type RentalItem, type RentalProductItem } from '../services/rentalService';
 import { customerService } from '../services/customerService';
 import { productService, type Product } from '../services/productService';
+import type { Customer } from '../types/customer';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+
+// Shape of Axios errors used in the catch blocks below
+type ApiError = {
+  response?: { status?: number; data?: { message?: string; error?: string } };
+  message?: string;
+};
 
 export interface RentalFormData {
   customer_id: string | '';
@@ -39,7 +46,7 @@ export const isFittingDateInvalid = (fittingDate: string, startDate: string): bo
 export function useRentals() {
   const { selectedStore, user } = useAuth();
   const [rentals, setRentals] = useState<Rental[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,7 +77,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
   const [hasLoadedReturned, setHasLoadedReturned] = useState(false);
 
   // Helper to compute late status based on business rule
-  const computeLateStatus = useCallback((rental: any) => {
+  const computeLateStatus = useCallback((rental: Pick<Rental, 'status' | 'end_date_scheduled'>) => {
     if (rental.status !== 'picked_up') return rental.status;
     if (!rental.end_date_scheduled) return rental.status;
     const today = new Date();
@@ -88,14 +95,14 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
         storeId: selectedStore?.id 
       });
       // Carrega apenas o resumo - detalhes serão carregados sob demanda
-      let normalized = Array.isArray(data) ? data.map((r: any) => {
+      let normalized = Array.isArray(data) ? data.map((r: Rental) => {
         // API não retorna customer_id, então buscamos por nome
         const customer = customersRef.current.find(c =>
           c.name.toLowerCase().trim() === (r.customer_name || '').toLowerCase().trim()
         );
         const baseRental = {
           ...r,
-          total_price: parseFloat(r.total_amount || '0'),
+          total_price: parseFloat(String(r.total_amount || 0)),
           items: r.items || [],
           customer_name: r.customer_name || '',
           customer_cpf: customer?.cpf || r.customer?.cpf || r.customer_cpf || '',
@@ -121,7 +128,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     } finally {
       setLoading(false);
     }
-  }, [computeLateStatus]);
+  }, [computeLateStatus, selectedStore?.id]);
 
   // Carregar cancelados sob demanda
   const loadCancelledRentals = useCallback(async () => {
@@ -129,14 +136,14 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     setLoadingCancelled(true);
     try {
       const data = await rentalService.getAll({ status: 'cancelled' });
-      const normalized = Array.isArray(data) ? data.map((r: any) => {
+      const normalized = Array.isArray(data) ? data.map((r: Rental) => {
         // API não retorna customer_id, buscamos por nome
         const customer = customersRef.current.find(c => 
           c.name.toLowerCase().trim() === (r.customer_name || '').toLowerCase().trim()
         );
         return {
           ...r,
-          total_price: parseFloat(r.total_amount || '0'),
+          total_price: parseFloat(String(r.total_amount || 0)),
           items: r.items || [],
           customer_name: r.customer_name || '',
           customer_cpf: customer?.cpf || r.customer?.cpf || r.customer_cpf || '',
@@ -158,14 +165,14 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     setLoadingReturned(true);
     try {
       const data = await rentalService.getAll({ status: 'returned' });
-      const normalized = Array.isArray(data) ? data.map((r: any) => {
+      const normalized = Array.isArray(data) ? data.map((r: Rental) => {
         // API não retorna customer_id, buscamos por nome
         const customer = customersRef.current.find(c => 
           c.name.toLowerCase().trim() === (r.customer_name || '').toLowerCase().trim()
         );
         return {
           ...r,
-          total_price: parseFloat(r.total_amount || '0'),
+          total_price: parseFloat(String(r.total_amount || 0)),
           items: r.items || [],
           customer_name: r.customer_name || '',
           customer_cpf: customer?.cpf || r.customer?.cpf || r.customer_cpf || '',
@@ -203,7 +210,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       console.error(`Erro ao buscar detalhes do aluguel ${id}:`, error);
       return null;
     }
-  }, [computeLateStatus]);
+  }, [computeLateStatus, selectedStore?.id]);
 
   // Invalidate cached rental details (e.g. after a payment changes the financial data)
   const clearRentalDetailsCache = useCallback((id?: string) => {
@@ -292,7 +299,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       // API retorna { status: 'success', data: { ...rental } }
       const rental = response.data?.data || response.data || response;
       
-      const loadedProducts = rental.items?.map((item: any) => ({ 
+      const loadedProducts = rental.items?.map((item: RentalItem) => ({ 
         id: item.product_id || item.productId || item.id, 
         quantity: item.quantity || 1,
         name: item.product_name || item.product?.name || undefined,
@@ -442,7 +449,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     }
 
     try {
-      let createdRental: any = null;
+      let createdRental: { id?: string } | null = null;
       if (isEditing && editingRentalId) {
         await rentalService.update(editingRentalId, payload);
         toast.success('Aluguel atualizado!', { id: loadingToast });
@@ -460,8 +467,9 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       
       // Return created rental for highlighting
       return createdRental;
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Erro ao salvar aluguel';
+    } catch (err) {
+      const apiErr = err as ApiError;
+      const msg = apiErr.response?.data?.message || apiErr.response?.data?.error || apiErr.message || 'Erro ao salvar aluguel';
       toast.error(msg, { id: loadingToast });
     }
   };
@@ -477,14 +485,15 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
         loadRentals({ status: statusFilter || undefined }),
         loadAvailableProducts()
       ]);
-    } catch (err: any) {
+    } catch (err) {
+      const apiErr = err as ApiError;
       console.error('handleReturn error:', {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message
+        status: apiErr.response?.status,
+        data: apiErr.response?.data,
+        message: apiErr.message
       });
-      const backendMsg = err.response?.data?.message || err.response?.data?.error;
-      if (err.response?.status === 500) {
+      const backendMsg = apiErr.response?.data?.message || apiErr.response?.data?.error;
+      if (apiErr.response?.status === 500) {
         toast.error('Erro interno no servidor ao processar devolução. Verifique os logs do backend.', { duration: 5000 });
       } else {
         toast.error(backendMsg || 'Erro ao devolver');
@@ -500,8 +509,8 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
         loadRentals({ status: statusFilter || undefined }),
         loadAvailableProducts()
       ]);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao marcar como retirado');
+    } catch (err) {
+      toast.error((err as ApiError).response?.data?.message || 'Erro ao marcar como retirado');
     }
   };
 
@@ -510,8 +519,8 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       await rentalService.cancelRental(id);
       toast.success('Aluguel cancelado!', { icon: '🚫' });
       loadRentals({ status: statusFilter || undefined });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao cancelar');
+    } catch (err) {
+      toast.error((err as ApiError).response?.data?.message || 'Erro ao cancelar');
     }
   };
 
@@ -520,8 +529,9 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
       await rentalService.deleteRental(id);
       toast.success('Aluguel excluído permanentemente!', { icon: '🗑️' });
       loadRentals({ status: statusFilter || undefined });
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Erro ao excluir aluguel';
+    } catch (err) {
+      const apiErr = err as ApiError;
+      const msg = apiErr.response?.data?.message || apiErr.response?.data?.error || apiErr.message || 'Erro ao excluir aluguel';
       toast.error(msg);
     }
   };

@@ -16,7 +16,7 @@ function Categories() {
     try {
       const data = await categoryService.getAll(); // O serviço já devolve o array limpo
       setCategories(data);
-    } catch (error) {
+    } catch {
       alert("Erro ao carregar categorias");
     } finally {
       setLoading(false);
@@ -30,9 +30,10 @@ function Categories() {
       await categoryService.delete(id);
       setCategories(categories.filter((cat) => cat.id !== id));
       alert("Categoria removida!");
-    } catch (error: any) {
-      if (error.response?.status === 400) {
-        alert(error.response.data.message);
+    } catch (error) {
+      const apiError = error as { response?: { status?: number; data?: { message?: string } } };
+      if (apiError.response?.status === 400) {
+        alert(apiError.response.data?.message ?? "Erro ao excluir categoria.");
       } else {
         alert("Erro ao excluir categoria.");
       }

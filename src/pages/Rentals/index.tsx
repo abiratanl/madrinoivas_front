@@ -1,8 +1,11 @@
 import { useState, useMemo, useEffect, Fragment } from 'react';
 import { UserPlus, Search, Package, Calendar, Loader2, RotateCcw, Trash2, ChevronDown, ChevronRight, Truck, Undo2, Ban, User, Edit2, DollarSign, FileText, Receipt } from 'lucide-react';
 import { useRentals } from '../../hooks/useRentals';
-import { rentalService } from '../../services/rentalService';
+import { rentalService, type Rental } from '../../services/rentalService';
 import { paymentService, type Payment, type RentalInstallment } from '../../services/paymentService';
+import { customerService } from '../../services/customerService';
+import type { Customer } from '../../types/customer';
+import type { Product } from '../../services/productService';
 import { issueReceipt } from '../../services/receiptService';
 import { getStoreMainPhone, getStoreMainEmail } from '../../services/storeService';
 import { RentalModal } from './components/RentalModal';
@@ -70,10 +73,10 @@ function ExpandedRowContent({
   onEditPayment,
   onCancelPayment,
 }: {
-  rental: any;
-  rentalDetailsCache: Record<string, any>;
-  availableProducts: any[];
-  customers: any[];
+  rental: Rental;
+  rentalDetailsCache: Record<string, Rental>;
+  availableProducts: Product[];
+  customers: Customer[];
   canManagePayments: boolean;
   onEditPayment: (payment: Payment) => void;
   onCancelPayment: (payment: Payment) => void;
@@ -137,7 +140,7 @@ function ExpandedRowContent({
   const customer = customers.find(c => String(c.id) === String(detailed.customer_id));
   
   // Calcular subtotal dos itens
-  const itemsSubtotal = items.reduce((sum: number, item: any) => {
+  const itemsSubtotal = items.reduce((sum: number, item) => {
     const unitPrice = Number(item.unit_price || item.product?.rental_price || 0);
     const qty = Number(item.quantity || 1);
     return sum + (unitPrice * qty);
@@ -155,7 +158,8 @@ function ExpandedRowContent({
   const remainingBalance = Math.max(0, totalPrice - totalPaid);
   const installments: RentalInstallment[] = detailed.installments || [];
   
-  const getItemCount = (rental: any) => (rental.items || []).reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
+  const getItemCount = (r: { items?: Array<{ quantity?: number }> }) =>
+    (r.items || []).reduce((sum: number, item) => sum + (item.quantity || 1), 0);
 
   return (
     <>
@@ -188,7 +192,7 @@ function ExpandedRowContent({
           Produtos do Aluguel ({items.length})
         </h4>
         <div className="space-y-2">
-          {items.map((item: any, idx: number) => {
+          {items.map((item, idx: number) => {
             const product = availableProducts.find(p => p.id === item.product_id);
             const productName = item.product_name || product?.name || item.product?.name || 'Produto não encontrado';
             const productCode = item.product_code || product?.code || item.product?.code || '';
@@ -460,15 +464,12 @@ export default function Rentals() {
     formData,
     setFormData,
     isModalOpen,
-    setIsModalOpen,
     isEditing,
     currentStep,
     setCurrentStep,
     searchTerm,
     statusFilter,
-    showInactives,
     setShowInactives,
-    editingRentalId,
     openCreateModal,
     openEditModal,
     closeModal,
@@ -551,14 +552,18 @@ export default function Rentals() {
     cnpj: selectedStore?.cnpj || '00.000.000/0000-00',
     phone: getStoreMainPhone(selectedStore) || '(00) 0000-0000',
     email: getStoreMainEmail(selectedStore) || 'contato@madrinoivas.com',
+    owner_name: selectedStore?.owner_name,
     digital_signature_base64: selectedStore?.digital_signature_base64,
   };
 
   // Contract modal state
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
-  const [contractRental, setContractRental] = useState<any>(null);
-  const [contractCustomer, setContractCustomer] = useState<any>(null);
-  const [contractItems, setContractItems] = useState<any[]>([]);
+  const [contractRental, setContractRental] = useState<Rental | null>(null);
+  const [contractCustomer, setContractCustomer] = useState<Customer | undefined>(undefined);
+  const [contractItems, setContractItems] = useState<
+    { product: Product; quantity: number; unit_price: number }[]
+  >([]);
+  const [contractPayments, setContractPayments] = useState<Payment[]>([]);
 
   const handleActionClick = (action: 'return' | 'cancel' | 'payment' | 'pickup' | 'contract' | 'delete', id: string) => {
     if (action === 'contract') {
@@ -594,15 +599,23 @@ export default function Rentals() {
 
       if (!rental) return; // TypeScript narrowing
 
-      const customer = customers.find(c => 
+      const customerSummary = customers.find(c => 
         c.name.toLowerCase().trim() === (rental.customer_name || '').toLowerCase().trim()
       );
 
+      // Load full customer data (addresses/contacts) and payment history in parallel
+      const [fullCustomer, payments] = await Promise.all([
+        customerSummary?.id
+          ? customerService.getById(customerSummary.id).catch(() => customerSummary)
+          : Promise.resolve(customerSummary),
+        paymentService.getByRental(rental.id).catch(() => [] as Payment[]),
+      ]);
+
       // Build items with product details
-      const itemsWithProducts = (rental.items || []).map((item: any) => {
+      const itemsWithProducts = (rental.items || []).map((item) => {
         const product = availableProducts.find(p => p.id === item.product_id || p.id === item.id);
         return {
-          product: product || {
+          product: product || ({
             id: item.product_id || item.id,
             name: item.product?.name || item.name || 'Produto',
             color: item.product?.color,
@@ -610,17 +623,18 @@ export default function Rentals() {
             brand: item.product?.brand,
             model: item.product?.model,
             accessories: item.product?.accessories,
-            sale_price: item.product?.sale_price || item.product?.rental_price * 10,
+            sale_price: item.product?.sale_price || (item.product?.rental_price || 0) * 10,
             rental_price: item.product?.rental_price || item.unit_price,
-          },
+          } as Product),
           quantity: item.quantity || 1,
           unit_price: item.unit_price || item.product?.rental_price || 0,
         };
       });
 
       setContractRental(rental);
-      setContractCustomer(customer);
+      setContractCustomer(fullCustomer);
       setContractItems(itemsWithProducts);
+      setContractPayments(payments);
       setIsContractModalOpen(true);
     } catch (err) {
       console.error('Erro ao abrir contrato:', err);
@@ -733,10 +747,6 @@ export default function Rentals() {
     });
   }, [allRentals, searchTerm, highlightedRentalId, showOnlyNew, statusFilter]);
 
-  const getCustomer = (customerId: string) => customers.find(c => String(c.id) === String(customerId));
-  const getItems = (rental: any) => rental.items || [];
-  const getItemCount = (rental: any) => getItems(rental).reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
-
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* HEADER */}
@@ -846,7 +856,6 @@ export default function Rentals() {
                 {filteredRentals.map((rental) => {
                   const customerName = rental.customer_name || 'Cliente não encontrado';
                   const customerInitial = customerName.charAt(0).toUpperCase() || '?';
-                  const items = getItems(rental);
                   const isExpanded = expandedRow === rental.id;
                   const isHighlighted = highlightedRentalId === rental.id;
                   
@@ -1090,6 +1099,7 @@ export default function Rentals() {
         customer={contractCustomer}
         store={storeData}
         items={contractItems}
+        payments={contractPayments}
         onGenerateContract={async (rentalId, signatureBase64) => {
           const response = await rentalService.generateContract(rentalId, { lessee_signature: signatureBase64 });
           return {

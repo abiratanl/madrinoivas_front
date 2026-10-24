@@ -75,9 +75,10 @@ const role = responseData.user.role?.toLowerCase();
         navigate('/auth/login');
       }
 
-    } catch (err: any) {
-      console.error("❌ Erro:", err.response?.data);
-      setError(err.response?.data?.message || 'Erro ao alterar senha.');
+    } catch (err) {
+      const apiErr = err as { response?: { data?: { message?: string } } };
+      console.error("❌ Erro:", apiErr.response?.data);
+      setError(apiErr.response?.data?.message || 'Erro ao alterar senha.');
     } finally {
       setLoading(false);
     }

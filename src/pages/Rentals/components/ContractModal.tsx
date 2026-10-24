@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { ContractPreview } from './ContractPreview';
 import { SignaturePad } from './SignaturePad';
 import { rentalService } from '../../../services/rentalService';
 import type { Rental } from '../../../services/rentalService';
+import type { Payment } from '../../../services/paymentService';
 import type { Customer } from '../../../types/customer';
 import type { Product } from '../../../services/productService';
 import { toast } from 'react-hot-toast';
@@ -21,6 +22,7 @@ interface ContractModalProps {
     cnpj: string;
     phone: string;
     email: string;
+    owner_name?: string | null;
     digital_signature_base64?: string;
   };
   items: Array<{
@@ -28,12 +30,20 @@ interface ContractModalProps {
     quantity: number;
     unit_price: number;
   }>;
+  payments?: Payment[];
   onGenerateContract: (rentalId: string, signatureBase64: string) => Promise<{ pdfUrl: string; contractId: string }>;
   onSendEmail: (contractId: string, email: string) => Promise<void>;
   onSendWhatsApp: (contractId: string, phone: string) => Promise<void>;
 }
 
 type ModalStep = 'preview' | 'signature' | 'processing' | 'done';
+
+// Extract the API error message from an unknown caught value
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  return (
+    (err as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback
+  );
+}
 
 export function ContractModal({
   isOpen,
@@ -42,6 +52,7 @@ export function ContractModal({
   customer,
   store,
   items,
+  payments,
   onGenerateContract,
   onSendEmail,
   onSendWhatsApp,
@@ -81,8 +92,8 @@ export function ContractModal({
       setContractId(result.contractId);
       setStep('done');
       toast.success('Contrato gerado e assinado com sucesso!');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao gerar contrato');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Erro ao gerar contrato'));
       setStep('signature');
     } finally {
       setLoading(false);
@@ -117,8 +128,8 @@ export function ContractModal({
     try {
       await onSendEmail(contractId, customer.email);
       toast.success('Contrato enviado por email!');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao enviar email');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Erro ao enviar email'));
     } finally {
       setLoading(false);
     }
@@ -133,8 +144,8 @@ export function ContractModal({
     try {
       await onSendWhatsApp(contractId, customer.main_phone);
       toast.success('Contrato enviado por WhatsApp!');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao enviar WhatsApp');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Erro ao enviar WhatsApp'));
     } finally {
       setLoading(false);
     }
@@ -176,6 +187,7 @@ export function ContractModal({
               customer={customer}
               store={store}
               items={items}
+              payments={payments}
               onPrint={handlePrint}
               onSign={handleSign}
               onDownload={handleDownload}

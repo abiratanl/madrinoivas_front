@@ -46,7 +46,7 @@ export interface CreateBannerDTO {
   target_blank?: boolean;
 }
 
-export interface UpdateBannerDTO extends Partial<CreateBannerDTO> {}
+export type UpdateBannerDTO = Partial<CreateBannerDTO>;
 
 export const bannerService = {
   getAll: async (filters?: {

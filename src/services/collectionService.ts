@@ -29,7 +29,7 @@ export interface CreateCollectionDTO {
   end_at?: string;
 }
 
-export interface UpdateCollectionDTO extends Partial<CreateCollectionDTO> {}
+export type UpdateCollectionDTO = Partial<CreateCollectionDTO>;
 
 export const collectionService = {
   getAll: async (filters?: {

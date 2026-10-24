@@ -1,4 +1,5 @@
 import { api } from '@/lib/axios';
+import type { RentalInstallment } from './paymentService';
 
 // Interface para o item do aluguel (frontend envia ID e Quantidade)
 export interface RentalProductItem {
@@ -12,6 +13,33 @@ export interface RentalProductItem {
   image_url?: string;
 }
 
+// Item de aluguel como retornado pelo backend (join rental_items + products)
+export interface RentalItem {
+  id?: string;
+  product_id?: string;
+  productId?: string;
+  product_name?: string;
+  product_code?: string;
+  name?: string;
+  code?: string;
+  image_url?: string;
+  unit_price?: number | string;
+  quantity?: number;
+  size?: string;
+  product?: {
+    name?: string;
+    code?: string;
+    color?: string;
+    size?: string;
+    brand?: string;
+    model?: string;
+    accessories?: string;
+    rental_price?: number;
+    sale_price?: number;
+    image_url?: string;
+  };
+}
+
 // Interface para criar um aluguel (Payload do POST)
 export interface CreateRentalDTO {
   customer_id: string;
@@ -19,7 +47,7 @@ export interface CreateRentalDTO {
   end_date_scheduled?: string;
   fitting_date?: string | null; // Data/hora da prova (ISO 8601, opcional)
   products?: RentalProductItem[]; // Array de produtos (opcional para update)
-  installments_config?: any;     // Configuração de parcelamento (se houver)
+  installments_config?: unknown;     // Configuração de parcelamento (se houver)
   store_id?: string;             // Opcional (backend pega do token se for vendedor)
   status?: 'budget' | 'reserved';  // Opcional (default costuma ser active ou budget)
   discount?: number;             // Desconto em reais
@@ -41,7 +69,8 @@ export interface Rental {
   end_date_scheduled: string;
   fitting_date?: string | null; // Data/hora da prova (ISO 8601, opcional)
   created_at?: string;
-  items?: any[]; // Itens populados se o backend retornar
+  items?: RentalItem[]; // Itens populados se o backend retornar
+  installments?: RentalInstallment[]; // Parcelas populadas no detalhe do aluguel
   customer?: {
     id: string;
     name: string;
@@ -92,11 +121,12 @@ export const rentalService = {
         penaltyFee: options?.penaltyFee || 0,
       });
       return response.data;
-    } catch (err: any) {
+    } catch (err) {
+      const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
       console.error('returnRental error:', {
-        status: err.response?.status,
-        data: JSON.stringify(err.response?.data, null, 2),
-        message: err.message
+        status: axiosErr.response?.status,
+        data: JSON.stringify(axiosErr.response?.data, null, 2),
+        message: axiosErr.message
       });
       throw err;
     }

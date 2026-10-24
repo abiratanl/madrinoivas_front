@@ -12,6 +12,7 @@ import {
 import { issueReceipt, issueReceiptForPrint } from '../../services/receiptService';
 import { cn } from '../../utils/cn';
 import { maskCurrency, numberToCurrencyInput, parseCurrency } from '../../utils/masks';
+import { PAYMENT_METHOD_OPTIONS, PAYMENT_TYPE_OPTIONS } from './paymentOptions';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -22,21 +23,6 @@ interface PaymentModalProps {
   // When provided, the modal switches to edit mode for this payment
   payment?: Payment | null;
 }
-
-export const PAYMENT_TYPE_OPTIONS: { value: PaymentType; label: string }[] = [
-  { value: 'entry', label: 'Entrada' },
-  { value: 'spontaneous', label: 'Pagamento Avulso / Amortização' },
-  { value: 'installment', label: 'Pagamento de Parcela' },
-  { value: 'pickup_balance', label: 'Quitação na Retirada' },
-];
-
-export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
-  { value: 'pix', label: 'Pix' },
-  { value: 'credit_card', label: 'Cartão de Crédito' },
-  { value: 'debit_card', label: 'Cartão de Débito' },
-  { value: 'cash', label: 'Dinheiro' },
-  { value: 'bank_transfer', label: 'Transferência Bancária' },
-];
 
 const formatBRL = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);

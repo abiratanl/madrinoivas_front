@@ -54,6 +54,8 @@ export interface Store {
   city: string | null;
   state: string | null;
   cnpj: string | null;
+  owner_name?: string | null;
+  owner_cpf?: string | null;
   digital_signature_base64?: string | undefined;
   is_active: boolean | number;
   created_at: string;

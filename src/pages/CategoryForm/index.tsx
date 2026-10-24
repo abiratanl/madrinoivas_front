@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { categoryService } from '../../services/categoryService';
 
@@ -10,26 +10,26 @@ function CategoryForm() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      loadCategory(id);
-    }
-  }, [id]);
-
-  async function loadCategory(categoryId: string) {
+  const loadCategory = useCallback(async (categoryId: string) => {
     try {
       setLoading(true);
       const response = await categoryService.getById(categoryId);
       const data = response.data;
       setName(data.name);
       setDescription(data.description || '');
-    } catch (error) {
+    } catch {
       alert('Erro ao carregar categoria');
       navigate('/categories');
     } finally {
       setLoading(false);
     }
-  }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (id) {
+      loadCategory(id);
+    }
+  }, [id, loadCategory]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

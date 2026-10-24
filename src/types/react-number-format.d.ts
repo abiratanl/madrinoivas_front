@@ -15,7 +15,7 @@ declare module 'react-number-format' {
       onBlur: React.FocusEventHandler<HTMLInputElement>; 
     }) => React.ReactElement;
     children?: React.ReactNode;
-    [key: string]: any;
+    [key: string]: unknown;
   }
   
   export function NumericFormat(props: NumericFormatProps): React.ReactElement;

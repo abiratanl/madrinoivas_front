@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { 
   FolderHeart, Plus, Trash2, Edit, X, Check, Image, 
-  Loader2, Package, ChevronLeft, ChevronRight, Search, Building2 
+  Loader2, Package, Search 
 } from 'lucide-react';
 import { collectionService, type Collection } from '../../services/collectionService';
 import { productService, type Product } from '../../services/productService';
@@ -15,7 +15,7 @@ interface ShowroomCollectionsProps {
 }
 
 export function ShowroomCollections({ selectedStoreId }: ShowroomCollectionsProps) {
-  const { user, selectedStore, availableStores } = useAuth();
+  const { selectedStore } = useAuth();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
@@ -50,12 +50,6 @@ export function ShowroomCollections({ selectedStoreId }: ShowroomCollectionsProp
   // Determine effective storeId: modal selection > prop > context
   const storeId = modalStoreId || selectedStoreId || selectedStore?.id;
 
-  useEffect(() => {
-    if (storeId) {
-      loadData();
-    }
-  }, [storeId]);
-
   const loadData = useCallback(async () => {
     if (!storeId) return;
     try {
@@ -73,6 +67,10 @@ export function ShowroomCollections({ selectedStoreId }: ShowroomCollectionsProp
       setLoading(false);
     }
   }, [storeId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

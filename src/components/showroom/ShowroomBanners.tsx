@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { 
-  Image, Plus, Trash2, Edit, X, Check, Loader2, 
-  ArrowUp, ArrowDown, Building2 
+  Image, Plus, Trash2, Edit, X, Loader2, 
+  ArrowUp, ArrowDown 
 } from 'lucide-react';
-import { bannerService, type Banner, type CreateBannerDTO, type UpdateBannerDTO } from '../../services/bannerService';
+import { bannerService, type Banner } from '../../services/bannerService';
 import { collectionService, type Collection } from '../../services/collectionService';
 import { storeService, type Store } from '../../services/storeService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,7 +15,7 @@ interface ShowroomBannersProps {
 }
 
 export function ShowroomBanners({ selectedStoreId }: ShowroomBannersProps) {
-  const { selectedStore, availableStores } = useAuth();
+  const { selectedStore } = useAuth();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
@@ -46,12 +46,6 @@ export function ShowroomBanners({ selectedStoreId }: ShowroomBannersProps) {
   // Determine effective storeId: modal selection > prop > context
   const storeId = modalStoreId || selectedStoreId || selectedStore?.id;
 
-  useEffect(() => {
-    if (storeId) {
-      loadData();
-    }
-  }, [storeId]);
-
   const loadData = useCallback(async () => {
     if (!storeId) return;
     setLoading(true);
@@ -69,6 +63,10 @@ export function ShowroomBanners({ selectedStoreId }: ShowroomBannersProps) {
       setLoading(false);
     }
   }, [storeId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
