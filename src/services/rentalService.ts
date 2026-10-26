@@ -166,6 +166,12 @@ export const rentalService = {
     return response.data;
   },
 
+  // GET /:id/contract - Buscar o contrato assinado mais recente do aluguel
+  getContractByRental: async (id: string) => {
+    const response = await api.get(`/rentals/${id}/contract`);
+    return response.data?.data || response.data;
+  },
+
   // POST /contracts/:id/send-email - Enviar contrato por email (id = contractId)
   sendContractEmail: async (id: string, data: { email: string }) => {
     const response = await api.post(`/contracts/${id}/send-email`, data);
@@ -175,6 +181,28 @@ export const rentalService = {
   // POST /contracts/:id/send-whatsapp - Enviar contrato por WhatsApp (id = contractId)
   sendContractWhatsApp: async (id: string, data: { phone: string }) => {
     const response = await api.post(`/contracts/${id}/send-whatsapp`, data);
+    return response.data?.data || response.data;
+  },
+
+  // POST /rentals/:id/contract/send-whatsapp - Send the unsigned contract
+  // preview by WhatsApp so the customer can read it before signing
+  sendContractPreviewWhatsApp: async (id: string, data: { phone: string }) => {
+    const response = await api.post(`/rentals/${id}/contract/send-whatsapp`, data);
+    return response.data?.data || response.data;
+  },
+
+  // GET /rentals/:id/contract/preview/pdf - Download the unsigned preview PDF
+  getContractPreviewPdf: async (id: string) => {
+    const response = await api.get(`/rentals/${id}/contract/preview/pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  // POST /rentals/:id/contract/send-email - Send the unsigned contract preview
+  // by e-mail so the customer can read it before signing
+  sendContractPreviewEmail: async (id: string, data: { email: string }) => {
+    const response = await api.post(`/rentals/${id}/contract/send-email`, data);
     return response.data?.data || response.data;
   },
 

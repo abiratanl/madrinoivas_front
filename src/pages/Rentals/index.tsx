@@ -573,6 +573,7 @@ export default function Rentals() {
     { product: Product; quantity: number; unit_price: number }[]
   >([]);
   const [contractPayments, setContractPayments] = useState<Payment[]>([]);
+  const [contractExistingId, setContractExistingId] = useState<string | null>(null);
 
   const handleActionClick = (action: 'return' | 'cancel' | 'payment' | 'pickup' | 'contract' | 'delete', id: string) => {
     if (action === 'contract') {
@@ -621,7 +622,7 @@ export default function Rentals() {
       // Load full customer, payment history and the rental's store in parallel.
       // The store is always read from the database so contract fields such as
       // CNPJ, city and state reflect the rental's actual store.
-      const [fullCustomer, payments, storeResponse] = await Promise.all([
+      const [fullCustomer, payments, storeResponse, existingContract] = await Promise.all([
         customerSummary?.id
           ? customerService.getById(customerSummary.id).catch(() => customerSummary)
           : Promise.resolve(customerSummary),
@@ -629,6 +630,7 @@ export default function Rentals() {
         rental.store_id
           ? storeService.getById(rental.store_id).catch(() => null)
           : Promise.resolve(null),
+        rentalService.getContractByRental(rental.id).catch(() => null),
       ]);
       const fullStore = (storeResponse?.data ?? storeResponse) as Store | null;
 
@@ -657,6 +659,7 @@ export default function Rentals() {
       setContractStore(fullStore);
       setContractItems(itemsWithProducts);
       setContractPayments(payments);
+      setContractExistingId(existingContract?.id ?? null);
       setIsContractModalOpen(true);
     } catch (err) {
       console.error('Erro ao abrir contrato:', err);
@@ -976,7 +979,7 @@ export default function Rentals() {
                             {(rental.status === 'budget' || rental.status === 'reserved') && (
                               <StopPropagationButton
                                 onClick={() => handleActionClick('contract', rental.id)}
-                                title="Gerar Contrato"
+                                title="Gerar / Visualizar Contrato"
                                 className="p-2 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-all active:scale-90"
                               >
                                 <FileText className="w-4 h-4" />
@@ -1114,28 +1117,41 @@ export default function Rentals() {
       />
 
       {/* MODAL DE CONTRATO */}
-      <ContractModal
-        isOpen={isContractModalOpen}
-        onClose={() => setIsContractModalOpen(false)}
-        rental={contractRental}
-        customer={contractCustomer}
-        store={buildStoreData(contractStore ?? selectedStore)}
-        items={contractItems}
-        payments={contractPayments}
-        onGenerateContract={async (rentalId, signatureBase64) => {
-          const response = await rentalService.generateContract(rentalId, { lessee_signature: signatureBase64 });
-          return {
-            contractId: response.data?.id || response.id,
-            pdfUrl: response.data?.pdf_url || response.pdf_url,
-          };
-        }}
-        onSendEmail={async (contractId, email) => {
-          return rentalService.sendContractEmail(contractId, { email });
-        }}
-        onSendWhatsApp={async (contractId, phone) => {
-          return rentalService.sendContractWhatsApp(contractId, { phone });
-        }}
-      />
+      {isContractModalOpen && contractRental && (
+        <ContractModal
+          key={contractRental.id}
+          isOpen={isContractModalOpen}
+          onClose={() => setIsContractModalOpen(false)}
+          rental={contractRental}
+          customer={contractCustomer}
+          store={buildStoreData(contractStore ?? selectedStore)}
+          items={contractItems}
+          payments={contractPayments}
+          initialContractId={contractExistingId}
+          onGenerateContract={async (rentalId, signatureBase64) => {
+            const response = await rentalService.generateContract(rentalId, { lessee_signature: signatureBase64 });
+            return {
+              contractId: response.data?.id || response.id,
+              pdfUrl: response.data?.pdf_url || response.pdf_url,
+            };
+          }}
+          onSendEmail={async (contractId, email) => {
+            return rentalService.sendContractEmail(contractId, { email });
+          }}
+          onSendWhatsApp={async (contractId, phone) => {
+            return rentalService.sendContractWhatsApp(contractId, { phone });
+          }}
+          onSendPreviewWhatsApp={async (rentalId, phone) => {
+            return rentalService.sendContractPreviewWhatsApp(rentalId, { phone });
+          }}
+          onDownloadPreview={async (rentalId) => {
+            return rentalService.getContractPreviewPdf(rentalId);
+          }}
+          onSendPreviewEmail={async (rentalId, email) => {
+            return rentalService.sendContractPreviewEmail(rentalId, { email });
+          }}
+        />
+      )}
 
       {/* MODAL DE DEVOLUÇÃO */}
       <ReturnModal
