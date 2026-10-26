@@ -162,12 +162,12 @@ export function ContractPreview({
       style={{ fontFamily: 'Georgia, serif' }}
     >
       {/* Título do Contrato */}
-      <div className="text-center mb-8">
-        <h2 className="text-xl font-bold underline decoration-2 underline-offset-4 mb-2">
+      <div className="text-center mb-10">
+        <h2 className="text-lg md:text-xl font-bold underline decoration-2 underline-offset-4 mb-5 text-balance">
           CONTRATO DE PRESTAÇÃO DE SERVIÇOS E LOCAÇÃO DE TRAJES A RIGOR
         </h2>
         <p className="text-sm text-gray-500">
-          Contrato Nº: <strong>{rental.id?.slice(0, 8).toUpperCase()}</strong>
+          Contrato Nº: <strong>A definir na assinatura</strong>
         </p>
       </div>
 

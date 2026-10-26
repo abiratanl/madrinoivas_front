@@ -8,6 +8,7 @@ import type { Payment } from '../../../services/paymentService';
 import type { Customer } from '../../../types/customer';
 import type { Product } from '../../../services/productService';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface ContractModalProps {
   isOpen: boolean;
@@ -33,7 +34,10 @@ interface ContractModalProps {
   }>;
   payments?: Payment[];
   initialContractId?: string | null;
-  onGenerateContract: (rentalId: string, signatureBase64: string) => Promise<{ pdfUrl: string; contractId: string }>;
+  onGenerateContract: (
+    rentalId: string,
+    signatureBase64: string,
+  ) => Promise<{ pdfUrl: string; contractId: string; contractNumber?: string | null }>;
   onSendEmail: (contractId: string, email: string) => Promise<{ emailDeliveryStatus?: string }>;
   onSendWhatsApp: (
     contractId: string,
@@ -48,6 +52,10 @@ interface ContractModalProps {
     rentalId: string,
     email: string,
   ) => Promise<{ emailDeliveryStatus?: string }>;
+  onCancelContract: (
+    contractId: string,
+    notes: string,
+  ) => Promise<{ status?: string; notes?: string | null }>;
 }
 
 type ModalStep = 'preview' | 'signature' | 'processing' | 'done';
@@ -74,11 +82,24 @@ export function ContractModal({
   onSendPreviewWhatsApp,
   onDownloadPreview,
   onSendPreviewEmail,
+  onCancelContract,
 }: ContractModalProps) {
+  const { user } = useAuth();
   const [step, setStep] = useState<ModalStep>(initialContractId ? 'done' : 'preview');
   const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
   const [contractId, setContractId] = useState<string | null>(initialContractId ?? null);
+  const [contractNumber, setContractNumber] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showCancelForm, setShowCancelForm] = useState(false);
+  const [cancelNotes, setCancelNotes] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+
+  const canCancelContract = Boolean(
+    user &&
+      ['admin', 'owner', 'local_manager', 'proprietario', 'gerente_local'].includes(
+        user.role.toLowerCase(),
+      ),
+  );
 
   const customerEmail =
     customer?.email ||
@@ -121,6 +142,7 @@ export function ContractModal({
     try {
       const result = await onGenerateContract(rental.id, signatureBase64);
       setContractId(result.contractId);
+      setContractNumber(result.contractNumber ?? null);
       setStep('done');
       toast.success('Contrato gerado e assinado com sucesso!');
     } catch (err) {
@@ -130,6 +152,32 @@ export function ContractModal({
       setLoading(false);
     }
   }, [rental, signatureBase64, onGenerateContract]);
+
+  const handleCancelContract = useCallback(async () => {
+    if (!contractId) return;
+
+    const notes = cancelNotes.trim();
+    if (!notes) {
+      toast.error('Informe o motivo do cancelamento.');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      await onCancelContract(contractId, notes);
+      setContractId(null);
+      setContractNumber(null);
+      setSignatureBase64(null);
+      setCancelNotes('');
+      setShowCancelForm(false);
+      setStep('preview');
+      toast.success('Contrato cancelado. Você já pode emitir um novo contrato.');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Erro ao cancelar contrato'));
+    } finally {
+      setCancelling(false);
+    }
+  }, [contractId, cancelNotes, onCancelContract]);
 
   // PDF/e-mail/WhatsApp are only available after the contract is signed. When
   // triggered from the preview, guide the user to the signature step first.
@@ -396,6 +444,11 @@ export function ContractModal({
                 </svg>
               </div>
               <h3 className="text-2xl font-bold text-gray-900">Contrato Assinado</h3>
+              {contractNumber && (
+                <p className="text-sm font-semibold tracking-wide text-purple-700">
+                  {contractNumber}
+                </p>
+              )}
               <p className="text-gray-600">
                 O contrato assinado está disponível para visualização, impressão e envio.
               </p>
@@ -420,7 +473,58 @@ export function ContractModal({
                 <button onClick={handleNewContract} className="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">
                   Novo Contrato
                 </button>
+                {canCancelContract && contractId && !showCancelForm && (
+                  <button
+                    onClick={() => setShowCancelForm(true)}
+                    disabled={loading || cancelling}
+                    className="px-6 py-2 border border-red-300 text-red-700 rounded-lg font-medium hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Cancelar contrato
+                  </button>
+                )}
               </div>
+
+              {showCancelForm && (
+                <div className="max-w-xl mx-auto text-left bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+                  <div>
+                    <label className="block text-sm font-bold text-red-800 mb-1">
+                      Motivo do cancelamento *
+                    </label>
+                    <p className="text-xs text-red-700 mb-2">
+                      O contrato será marcado como cancelado. O PDF e o hash são mantidos para
+                      auditoria e um novo contrato poderá ser emitido.
+                    </p>
+                    <textarea
+                      value={cancelNotes}
+                      onChange={(event) => setCancelNotes(event.target.value)}
+                      maxLength={2000}
+                      rows={3}
+                      placeholder="Descreva o motivo do cancelamento..."
+                      className="w-full border border-red-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => {
+                        setShowCancelForm(false);
+                        setCancelNotes('');
+                      }}
+                      disabled={cancelling}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-white disabled:opacity-50"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      onClick={handleCancelContract}
+                      disabled={cancelling || !cancelNotes.trim()}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {cancelling && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Confirmar cancelamento
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
