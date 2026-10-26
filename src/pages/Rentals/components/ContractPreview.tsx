@@ -5,7 +5,7 @@ import type { Rental } from '../../../services/rentalService';
 import type { Customer } from '../../../types/customer';
 import type { Product } from '../../../services/productService';
 import type { Payment } from '../../../services/paymentService';
-import { PAYMENT_METHOD_OPTIONS } from '../../../components/rentals/PaymentModal';
+import { PAYMENT_METHOD_OPTIONS } from '../../../components/rentals/paymentOptions';
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = Object.fromEntries(
   PAYMENT_METHOD_OPTIONS.map((o) => [o.value, o.label]),
@@ -30,6 +30,7 @@ interface ContractPreviewProps {
     phone: string;
     email: string;
     owner_name?: string | null;
+    owner_signature_url?: string | null;
     digital_signature_base64?: string;
   };
   items: Array<{
@@ -258,8 +259,12 @@ export function ContractPreview({
             <p className="font-bold uppercase tracking-wider">LOCADORA</p>
             <p className="text-sm mt-2">{store.name}</p>
             <p className="text-xs text-gray-500 mt-1">CNPJ: {store.cnpj || LESSOR_CNPJ}</p>
-            {store.digital_signature_base64 && (
-              <img src={`data:image/png;base64,${store.digital_signature_base64}`} alt="Assinatura Locadora" className="mx-auto mt-4 max-h-20" />
+            {store.owner_signature_url ? (
+              <img src={store.owner_signature_url} alt="Assinatura Locadora" className="mx-auto mt-4 max-h-20 object-contain" />
+            ) : (
+              store.digital_signature_base64 && (
+                <img src={`data:image/png;base64,${store.digital_signature_base64}`} alt="Assinatura Locadora" className="mx-auto mt-4 max-h-20" />
+              )
             )}
           </div>
         </div>

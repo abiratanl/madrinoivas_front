@@ -11,11 +11,11 @@ import { getStoreMainPhone, getStoreMainEmail } from '../../services/storeServic
 import { RentalModal } from './components/RentalModal';
 import { ContractModal } from './components/ContractModal';
 import { ReturnModal } from '../../components/rentals/ReturnModal';
+import { PaymentModal } from '../../components/rentals/PaymentModal';
 import {
-  PaymentModal,
   PAYMENT_TYPE_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
-} from '../../components/rentals/PaymentModal';
+} from '../../components/rentals/paymentOptions';
 import { CancelPaymentModal } from '@/components/rentals/CancelPaymentModal';
 import { cn } from '../../utils/cn';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
@@ -553,6 +553,7 @@ export default function Rentals() {
     phone: getStoreMainPhone(selectedStore) || '(00) 0000-0000',
     email: getStoreMainEmail(selectedStore) || 'contato@madrinoivas.com',
     owner_name: selectedStore?.owner_name,
+    owner_signature_url: selectedStore?.owner_signature_url,
     digital_signature_base64: selectedStore?.digital_signature_base64,
   };
 
@@ -627,7 +628,7 @@ export default function Rentals() {
             rental_price: item.product?.rental_price || item.unit_price,
           } as Product),
           quantity: item.quantity || 1,
-          unit_price: item.unit_price || item.product?.rental_price || 0,
+          unit_price: Number(item.unit_price || item.product?.rental_price || 0),
         };
       });
 

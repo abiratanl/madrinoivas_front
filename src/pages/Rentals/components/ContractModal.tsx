@@ -23,6 +23,7 @@ interface ContractModalProps {
     phone: string;
     email: string;
     owner_name?: string | null;
+    owner_signature_url?: string | null;
     digital_signature_base64?: string;
   };
   items: Array<{
