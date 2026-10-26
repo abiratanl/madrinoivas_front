@@ -1,9 +1,23 @@
 import { useState, useCallback } from 'react';
-import { storeService, type Store, type CreateStoreDTO, type UpdateStoreDTO, type StoreAddress, type StoreContact } from '../services/storeService';
+import {
+  storeService,
+  type Store,
+  type CreateStoreDTO,
+  type UpdateStoreDTO,
+  type StoreAddress,
+  type StoreContact,
+  type StorePayload,
+} from '../services/storeService';
 
 interface StoreFormData {
   id: string; 
   name: string;
+  cnpj: string;
+  owner_name: string;
+  owner_cpf: string;
+  owner_signature: string | null;
+  ownerSignatureFile: File | null;
+  removeOwnerSignature: boolean;
   is_active: boolean;
   addresses: StoreAddress[];
   contacts: StoreContact[];
@@ -38,6 +52,12 @@ export function useStores() {
   const [formData, setFormData] = useState<StoreFormData>({
     id: '', 
     name: '',
+    cnpj: '',
+    owner_name: '',
+    owner_cpf: '',
+    owner_signature: null,
+    ownerSignatureFile: null,
+    removeOwnerSignature: false,
     is_active: true,
     addresses: [emptyAddress],
     contacts: [emptyContact],
@@ -60,6 +80,12 @@ export function useStores() {
     setFormData({
       id: String(store.id), 
       name: store.name,
+      cnpj: store.cnpj || '',
+      owner_name: store.owner_name || '',
+      owner_cpf: store.owner_cpf || '',
+      owner_signature: store.owner_signature_url || store.owner_signature || null,
+      ownerSignatureFile: null,
+      removeOwnerSignature: false,
       is_active: store.is_active === true || store.is_active === 1,
       addresses: store.addresses && store.addresses.length > 0 
         ? store.addresses 
@@ -72,7 +98,19 @@ export function useStores() {
   };
 
   const resetForm = () => {
-    setFormData({ id: '', name: '', is_active: true, addresses: [emptyAddress], contacts: [emptyContact] });
+    setFormData({
+      id: '',
+      name: '',
+      cnpj: '',
+      owner_name: '',
+      owner_cpf: '',
+      owner_signature: null,
+      ownerSignatureFile: null,
+      removeOwnerSignature: false,
+      is_active: true,
+      addresses: [emptyAddress],
+      contacts: [emptyContact],
+    });
     setIsEditing(false);
   };
 
@@ -96,19 +134,42 @@ export function useStores() {
         validContacts[0].is_primary = true;
       }
 
+      const storeData: CreateStoreDTO = {
+        name: formData.name,
+        cnpj: formData.cnpj.trim() || null,
+        owner_name: formData.owner_name.trim() || null,
+        owner_cpf: formData.owner_cpf.trim() || null,
+        addresses: validAddresses,
+        contacts: validContacts,
+      };
+
+      let payload: StorePayload = storeData;
+
+      if (formData.ownerSignatureFile || formData.removeOwnerSignature) {
+        payload = new FormData();
+        payload.append('name', storeData.name);
+        payload.append('cnpj', storeData.cnpj || '');
+        payload.append('owner_name', storeData.owner_name || '');
+        payload.append('owner_cpf', storeData.owner_cpf || '');
+        payload.append('addresses', JSON.stringify(validAddresses));
+        payload.append('contacts', JSON.stringify(validContacts));
+
+        if (formData.ownerSignatureFile) {
+          payload.append(
+            'owner_signature',
+            formData.ownerSignatureFile,
+            formData.ownerSignatureFile.name,
+          );
+        } else {
+          payload.append('owner_signature', '');
+        }
+      }
+
       if (isEditing && formData.id) {
-        await storeService.update(formData.id, {
-          name: formData.name,
-          addresses: validAddresses,
-          contacts: validContacts,
-        });
+        await storeService.update(formData.id, payload);
         alert('Loja atualizada com sucesso!');
       } else {
-        await storeService.create({
-          name: formData.name,
-          addresses: validAddresses,
-          contacts: validContacts,
-        });
+        await storeService.create(payload);
         alert('Loja criada com sucesso!');
       }
       

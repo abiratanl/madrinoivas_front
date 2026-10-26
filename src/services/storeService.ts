@@ -56,6 +56,8 @@ export interface Store {
   cnpj: string | null;
   owner_name?: string | null;
   owner_cpf?: string | null;
+  owner_signature?: string | null;
+  owner_signature_url?: string | null;
   digital_signature_base64?: string | undefined;
   is_active: boolean | number;
   created_at: string;
@@ -66,15 +68,40 @@ export interface Store {
 
 export interface CreateStoreDTO {
   name: string;
+  cnpj?: string | null;
+  owner_name?: string | null;
+  owner_cpf?: string | null;
   addresses?: StoreAddress[];
   contacts?: StoreContact[];
 }
 
 export interface UpdateStoreDTO {
   name?: string;
+  cnpj?: string | null;
+  owner_name?: string | null;
+  owner_cpf?: string | null;
   addresses?: StoreAddress[];
   contacts?: StoreContact[];
   is_active?: boolean;
+}
+
+export type StorePayload = CreateStoreDTO | UpdateStoreDTO | FormData;
+
+const R2_PUBLIC_URL = (import.meta.env.VITE_R2_PUBLIC_URL as string | undefined)?.replace(
+  /\/$/,
+  '',
+);
+
+/**
+ * Resolves the owner signature path stored in the database into a public URL.
+ * The API may also return an already resolved URL (or a legacy data URL).
+ */
+export function resolveStoreSignatureUrl(signature?: string | null): string | null {
+  if (!signature) return null;
+  if (/^(https?:|data:)/i.test(signature)) return signature;
+
+  const key = signature.replace(/^\/+/, '');
+  return R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${key}` : key;
 }
 
 // --- Service Object ---
@@ -112,8 +139,10 @@ export const storeService = {
    * POST /stores
    * Creates a new store.
    */
-  create: async (data: CreateStoreDTO) => {
-    const response = await api.post('/stores', data);
+  create: async (data: StorePayload) => {
+    const response = await api.post('/stores', data, {
+      headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    });
     return response.data;
   },
 
@@ -121,8 +150,10 @@ export const storeService = {
    * PUT /stores/:id
    * Updates an existing store.
    */
-  update: async (id: string, data: UpdateStoreDTO) => { 
-    const response = await api.put(`/stores/${id}`, data);
+  update: async (id: string, data: StorePayload) => { 
+    const response = await api.put(`/stores/${id}`, data, {
+      headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    });
     return response.data;
   },
 

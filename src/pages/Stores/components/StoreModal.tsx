@@ -1,13 +1,36 @@
 import React, { useState } from 'react';
-import { X, Check, Phone, MapPin, Plus, Trash } from 'lucide-react';
+import {
+  X,
+  Check,
+  Phone,
+  MapPin,
+  Plus,
+  Trash,
+  Upload,
+  FileSignature,
+  ArrowLeft,
+  ArrowRight,
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { cn } from '../../../utils/cn';
-import { maskPhone, maskCEP } from '../../../utils/masks';
+import { maskPhone, maskCEP, maskCPF, maskCNPJ } from '../../../utils/masks';
 import { BRAZILIAN_STATES } from '../../../constants/brazilianStates';
-import type { StoreAddress, StoreContact, StoreContactType } from '../../../services/storeService';
+import {
+  resolveStoreSignatureUrl,
+  type StoreAddress,
+  type StoreContact,
+  type StoreContactType,
+} from '../../../services/storeService';
 
 interface StoreFormData {
   id: string; 
   name: string;
+  cnpj: string;
+  owner_name: string;
+  owner_cpf: string;
+  owner_signature: string | null;
+  ownerSignatureFile: File | null;
+  removeOwnerSignature: boolean;
   is_active: boolean;
   addresses: StoreAddress[];
   contacts: StoreContact[];
@@ -39,6 +62,25 @@ export function StoreModal({
   handleSubmit, submitting
 }: StoreModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const signatureInputRef = React.useRef<HTMLInputElement>(null);
+
+  const newSignaturePreview = React.useMemo(
+    () => (formData.ownerSignatureFile ? URL.createObjectURL(formData.ownerSignatureFile) : null),
+    [formData.ownerSignatureFile],
+  );
+
+  React.useEffect(() => {
+    return () => {
+      if (newSignaturePreview) URL.revokeObjectURL(newSignaturePreview);
+    };
+  }, [newSignaturePreview]);
+
+  const existingSignatureUrl = React.useMemo(
+    () => resolveStoreSignatureUrl(formData.owner_signature),
+    [formData.owner_signature],
+  );
+
+  const signaturePreview = newSignaturePreview || existingSignatureUrl;
 
   React.useEffect(() => {
     if (!isOpen) {
@@ -100,7 +142,13 @@ export function StoreModal({
   };
 
   const isStep1Valid = () => {
-    return (formData.name?.trim()?.length ?? 0) >= 3;
+    const nameIsValid = (formData.name?.trim()?.length ?? 0) >= 3;
+    const cnpjDigits = (formData.cnpj || '').replace(/\D/g, '');
+    const cpfDigits = (formData.owner_cpf || '').replace(/\D/g, '');
+    const cnpjIsValid = cnpjDigits.length === 0 || cnpjDigits.length === 14;
+    const cpfIsValid = cpfDigits.length === 0 || cpfDigits.length === 11;
+
+    return nameIsValid && cnpjIsValid && cpfIsValid;
   };
 
   const isStep2Valid = () => {
@@ -109,13 +157,75 @@ export function StoreModal({
     return hasAddress;
   };
 
-  const handleFinalAction = async (e: React.FormEvent) => {
-    const isOk = await handleSubmit(e);
+  const isStep3Valid = () => true;
+
+  const isCurrentStepValid = () => {
+    if (currentStep === 1) return isStep1Valid();
+    if (currentStep === 2) return isStep2Valid();
+    return isStep3Valid();
+  };
+
+  const handleSignatureFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Envie um arquivo de imagem para a assinatura.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('A assinatura deve ter no máximo 5MB.');
+      return;
+    }
+
+    setFormData({
+      ...formData,
+      ownerSignatureFile: file,
+      removeOwnerSignature: false,
+    });
+  };
+
+  const discardNewSignature = () => {
+    setFormData({ ...formData, ownerSignatureFile: null });
+  };
+
+  const removeExistingSignature = () => {
+    setFormData({
+      ...formData,
+      owner_signature: null,
+      ownerSignatureFile: null,
+      removeOwnerSignature: true,
+    });
+  };
+
+  const handleFinalAction = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
+
+    // The form must only be saved on the last step. Any earlier submit event
+    // (e.g. pressing Enter while filling the address) just advances the wizard.
+    if (currentStep < 3) {
+      goToNextStep();
+      return;
+    }
+
+    const isOk = await handleSubmit(e as React.FormEvent);
 
     if (isOk) {
       onClose();
       setCurrentStep(1);
     }
+  };
+
+  const goToNextStep = () => {
+    if (!isCurrentStepValid()) return;
+    setCurrentStep((step) => Math.min(step + 1, 3));
+  };
+
+  const goToPreviousStep = () => {
+    setCurrentStep((step) => Math.max(step - 1, 1));
   };
 
   return (
@@ -129,7 +239,7 @@ export function StoreModal({
             <button onClick={handleClose}><X className="w-6 h-6" /></button>
           </div>
           <div className="flex items-center justify-between relative px-4 text-white">
-            {[1, 2].map((step) => (
+            {[1, 2, 3].map((step) => (
               <div key={step} className="flex flex-col items-center z-10">
                 <div className={cn(
                   "w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 transition-all",
@@ -138,7 +248,7 @@ export function StoreModal({
                   {currentStep > step ? <Check className="w-6 h-6" /> : step}
                 </div>
                 <span className="text-[10px] mt-2 font-bold uppercase tracking-wider">
-                  {step === 1 ? 'Dados' : 'Endereço'}
+                  {step === 1 ? 'Dados' : step === 2 ? 'Endereço' : 'Assinatura'}
                 </span>
               </div>
             ))}
@@ -147,19 +257,59 @@ export function StoreModal({
         </div>
 
         {/* FORMULÁRIO COM SCROLL */}
-        <form id="store-form" onSubmit={handleFinalAction} onKeyDown={(e) => {
-          if (e.key === 'Enter' && currentStep < 2) {
+        <form id="store-form" onSubmit={(e) => {
+          e.preventDefault();
+          if (currentStep < 3) {
+            goToNextStep();
+          } else {
+            void handleFinalAction(e);
+          }
+        }} onKeyDown={(e) => {
+          if (e.key === 'Enter' && currentStep < 3) {
             e.preventDefault();
-            if (currentStep === 1 ? isStep1Valid() : isStep2Valid()) {
-              setCurrentStep(prev => prev + 1);
-            }
+            e.stopPropagation();
+            goToNextStep();
           }
         }} className="flex-1 overflow-y-auto p-6 space-y-6">
           {currentStep === 1 && (
             <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-              <div className="grid grid-cols-1">
-                <label className="text-xs font-bold text-gray-500 uppercase">Nome da Loja</label>
-                <input required type="text" className="w-full mt-1 px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Ex: Madri Noivas - Centro" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Nome da Loja</label>
+                  <input required type="text" className="w-full mt-1 px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Ex: Madri Noivas - Centro" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">CNPJ</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="w-full mt-1 px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500"
+                    value={formData.cnpj || ''}
+                    onChange={e => setFormData({ ...formData, cnpj: maskCNPJ(e.target.value) })}
+                    placeholder="00.000.000/0000-00"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Nome do Proprietário</label>
+                  <input
+                    type="text"
+                    className="w-full mt-1 px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500"
+                    value={formData.owner_name || ''}
+                    onChange={e => setFormData({ ...formData, owner_name: e.target.value })}
+                    placeholder="Nome completo do responsável legal"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">CPF do Proprietário</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="w-full mt-1 px-4 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500"
+                    value={formData.owner_cpf || ''}
+                    onChange={e => setFormData({ ...formData, owner_cpf: maskCPF(e.target.value) })}
+                    placeholder="000.000.000-00"
+                  />
+                </div>
               </div>
               {/* SEÇÃO DE CONTATOS */}
               <div className="space-y-3">
@@ -364,38 +514,141 @@ export function StoreModal({
               </div>
             </div>
           )}
+
+          {currentStep === 3 && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                  <FileSignature className="w-4 h-4 text-rose-500" /> Assinatura do Proprietário
+                </h4>
+              </div>
+
+              <p className="text-sm text-gray-600">
+                Envie uma imagem da assinatura do responsável legal da loja. Ela será usada nos
+                contratos de aluguel.
+              </p>
+
+              <input
+                ref={signatureInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleSignatureFile}
+                className="hidden"
+              />
+
+              {signaturePreview ? (
+                <div className="space-y-3">
+                  <div className="relative rounded-xl border border-gray-200 bg-white p-6">
+                    <span
+                      className={cn(
+                        "absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider",
+                        newSignaturePreview
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                      )}
+                    >
+                      {newSignaturePreview ? 'Nova assinatura' : 'Assinatura atual'}
+                    </span>
+                    <img
+                      src={signaturePreview}
+                      alt="Assinatura do proprietário"
+                      className="mx-auto max-h-40 object-contain"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => signatureInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-lg border-2 border-rose-200 bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 transition-all hover:border-rose-400"
+                    >
+                      <Upload className="w-4 h-4" />
+                      {newSignaturePreview ? 'Escolher outra' : 'Substituir assinatura'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={newSignaturePreview ? discardNewSignature : removeExistingSignature}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-gray-500 transition-all hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash className="w-4 h-4" />
+                      {newSignaturePreview ? 'Descartar nova' : 'Remover assinatura'}
+                    </button>
+                  </div>
+
+                  {newSignaturePreview && existingSignatureUrl && (
+                    <p className="text-xs text-gray-400">
+                      A nova assinatura substituirá a atual ao salvar.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => signatureInputRef.current?.click()}
+                  className="block w-full cursor-pointer rounded-xl border-2 border-dashed border-gray-300 p-8 text-center transition-colors hover:border-rose-500 hover:bg-rose-50"
+                >
+                  <Upload className="mx-auto mb-2 h-10 w-10 text-gray-300" />
+                  <span className="mb-1 block font-medium text-gray-500">
+                    Selecionar arquivo
+                  </span>
+                  <span className="text-xs text-gray-400">PNG, JPG ou WEBP até 5MB</span>
+                </button>
+              )}
+
+              <p className="text-xs text-gray-400">
+                A imagem será enviada para o Cloudflare R2; apenas o caminho do arquivo será salvo
+                no banco de dados.
+              </p>
+            </div>
+          )}
         </form>
 
         {/* FOOTER */}
         <div className="p-6 border-t bg-gray-50 flex justify-between">
-          {currentStep < 2 ? (
+          {currentStep > 1 ? (
             <button
               type="button"
-              disabled={currentStep === 1 ? !isStep1Valid() : !isStep2Valid()}
-              className={cn(
-                "px-8 py-2.5 rounded-xl font-bold shadow-lg transition-all",
-                (currentStep === 1 ? isStep1Valid() : isStep2Valid())
-                  ? "bg-rose-600 text-white hover:bg-rose-700 active:scale-95"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
-              )}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setCurrentStep(prev => prev + 1);
-              }}
+              onClick={goToPreviousStep}
+              className="px-6 py-2.5 rounded-xl font-bold border border-gray-200 text-gray-600 hover:bg-gray-100 transition-all flex items-center gap-2"
             >
-              Continuar
+              <ArrowLeft className="w-4 h-4" />
+              Voltar
             </button>
           ) : (
-            <button
-              type="submit"
-              form="store-form"
-              disabled={submitting}
-              className="px-8 py-2.5 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? 'Salvando...' : (isEditing ? 'Salvar Alterações' : 'Cadastrar Loja')}
-            </button>
+            <div />
           )}
+
+          <div className="flex gap-3 ml-auto">
+            {currentStep < 3 ? (
+              <button
+                type="button"
+                disabled={!isCurrentStepValid()}
+                className={cn(
+                  "px-8 py-2.5 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2",
+                  isCurrentStepValid()
+                    ? "bg-rose-600 text-white hover:bg-rose-700 active:scale-95"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                )}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  goToNextStep();
+                }}
+              >
+                Continuar
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleFinalAction}
+                disabled={submitting}
+                className="px-8 py-2.5 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Salvando...' : (isEditing ? 'Salvar Alterações' : 'Cadastrar Loja')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
