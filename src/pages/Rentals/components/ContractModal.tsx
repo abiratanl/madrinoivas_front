@@ -32,12 +32,22 @@ interface ContractModalProps {
     unit_price: number;
   }>;
   payments?: Payment[];
+  initialContractId?: string | null;
   onGenerateContract: (rentalId: string, signatureBase64: string) => Promise<{ pdfUrl: string; contractId: string }>;
   onSendEmail: (contractId: string, email: string) => Promise<{ emailDeliveryStatus?: string }>;
   onSendWhatsApp: (
     contractId: string,
     phone: string,
   ) => Promise<{ whatsappDeliveryStatus?: string }>;
+  onSendPreviewWhatsApp: (
+    rentalId: string,
+    phone: string,
+  ) => Promise<{ whatsappDeliveryStatus?: string }>;
+  onDownloadPreview: (rentalId: string) => Promise<Blob>;
+  onSendPreviewEmail: (
+    rentalId: string,
+    email: string,
+  ) => Promise<{ emailDeliveryStatus?: string }>;
 }
 
 type ModalStep = 'preview' | 'signature' | 'processing' | 'done';
@@ -57,13 +67,17 @@ export function ContractModal({
   store,
   items,
   payments,
+  initialContractId,
   onGenerateContract,
   onSendEmail,
   onSendWhatsApp,
+  onSendPreviewWhatsApp,
+  onDownloadPreview,
+  onSendPreviewEmail,
 }: ContractModalProps) {
-  const [step, setStep] = useState<ModalStep>('preview');
+  const [step, setStep] = useState<ModalStep>(initialContractId ? 'done' : 'preview');
   const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
-  const [contractId, setContractId] = useState<string | null>(null);
+  const [contractId, setContractId] = useState<string | null>(initialContractId ?? null);
   const [loading, setLoading] = useState(false);
 
   const customerEmail =
@@ -145,6 +159,33 @@ export function ContractModal({
     }
   }, [contractId, ensureContract, rental]);
 
+  const handleViewSigned = useCallback(async () => {
+    if (!contractId) return;
+    setLoading(true);
+    const previewWindow = window.open('', '_blank');
+    try {
+      // Authenticated fetch: a plain <a href> would not send the Bearer token
+      const blob = await rentalService.getContractPdfById(contractId);
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+
+      if (previewWindow) {
+        previewWindow.location.href = url;
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.click();
+      }
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch {
+      previewWindow?.close();
+      toast.error('Erro ao abrir o PDF do contrato');
+    } finally {
+      setLoading(false);
+    }
+  }, [contractId]);
+
   const handleSendEmail = useCallback(async () => {
     if (!ensureContract() || !contractId) return;
     if (!customerEmail) {
@@ -167,6 +208,72 @@ export function ContractModal({
       setLoading(false);
     }
   }, [contractId, customerEmail, ensureContract, onSendEmail]);
+
+  // Preview actions work on the unsigned document so the customer can read it
+  // before signing on the tablet.
+  const handleDownloadPreview = useCallback(async () => {
+    if (!rental) return;
+    setLoading(true);
+    try {
+      const blob = await onDownloadPreview(rental.id);
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `previa-contrato-${rental.id.slice(0, 8)}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Erro ao gerar a prévia do contrato'));
+    } finally {
+      setLoading(false);
+    }
+  }, [rental, onDownloadPreview]);
+
+  const handleSendPreviewEmail = useCallback(async () => {
+    if (!rental) return;
+    if (!customerEmail) {
+      toast.error('Email do cliente não disponível');
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await onSendPreviewEmail(rental.id, customerEmail);
+      if (result.emailDeliveryStatus === 'failed') {
+        toast.error(
+          'Não foi possível enviar a prévia do contrato por e-mail. Tente novamente mais tarde.',
+        );
+      } else {
+        toast.success('Prévia do contrato enviada por e-mail!');
+      }
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Erro ao enviar a prévia do contrato por e-mail'));
+    } finally {
+      setLoading(false);
+    }
+  }, [rental, customerEmail, onSendPreviewEmail]);
+
+  const handleSendPreviewWhatsApp = useCallback(async () => {
+    if (!rental) return;
+    if (!customerPhone) {
+      toast.error('Telefone do cliente não disponível');
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await onSendPreviewWhatsApp(rental.id, customerPhone);
+      if (result.whatsappDeliveryStatus === 'failed') {
+        toast.error(
+          'Não foi possível enviar a prévia do contrato pelo WhatsApp. Tente novamente mais tarde.',
+        );
+      } else {
+        toast.success('Prévia do contrato enviada por WhatsApp!');
+      }
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Erro ao enviar a prévia do contrato pelo WhatsApp'));
+    } finally {
+      setLoading(false);
+    }
+  }, [rental, customerPhone, onSendPreviewWhatsApp]);
 
   const handleSendWhatsApp = useCallback(async () => {
     if (!ensureContract() || !contractId) return;
@@ -230,9 +337,9 @@ export function ContractModal({
               payments={payments}
               onPrint={handlePrint}
               onSign={handleSign}
-              onDownload={handleDownload}
-              onSendEmail={handleSendEmail}
-              onSendWhatsApp={handleSendWhatsApp}
+              onDownload={handleDownloadPreview}
+              onSendEmail={handleSendPreviewEmail}
+              onSendWhatsApp={handleSendPreviewWhatsApp}
             />
           )}
 
@@ -288,10 +395,15 @@ export function ContractModal({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">Contrato Assinado com Sucesso!</h3>
-              <p className="text-gray-600">O contrato foi gerado, assinado e salvo no sistema.</p>
+              <h3 className="text-2xl font-bold text-gray-900">Contrato Assinado</h3>
+              <p className="text-gray-600">
+                O contrato assinado está disponível para visualização, impressão e envio.
+              </p>
               
               <div className="flex flex-wrap justify-center gap-3 pt-4">
+                <button onClick={handleViewSigned} disabled={loading} className="px-6 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
+                  🖨 Visualizar / Imprimir
+                </button>
                 <button onClick={handleDownload} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2">
                   ⬇ Baixar PDF
                 </button>
