@@ -69,6 +69,7 @@ function ChangePassword() {
 const role = responseData.user.role?.toLowerCase();
           if (role === 'admin') navigate('/users');
           else if (role === 'owner') navigate('/dashboard');
+          else if (role === 'local_manager') navigate('/dashboard/local');
           else if (role === 'attendant') navigate('/rentals');
           else navigate('/client-area');
       } else {

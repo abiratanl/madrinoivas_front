@@ -7,7 +7,7 @@ export interface User {
   id: string; // UUID (char(36))
   name: string;
   email: string;
-  role: 'admin' | 'owner' | 'attendant' | 'customer';
+  role: 'admin' | 'owner' | 'attendant' | 'customer' | 'local_manager';
   is_active: boolean | number;
 }
 
