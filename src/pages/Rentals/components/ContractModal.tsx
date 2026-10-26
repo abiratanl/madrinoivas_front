@@ -33,8 +33,11 @@ interface ContractModalProps {
   }>;
   payments?: Payment[];
   onGenerateContract: (rentalId: string, signatureBase64: string) => Promise<{ pdfUrl: string; contractId: string }>;
-  onSendEmail: (contractId: string, email: string) => Promise<void>;
-  onSendWhatsApp: (contractId: string, phone: string) => Promise<void>;
+  onSendEmail: (contractId: string, email: string) => Promise<{ emailDeliveryStatus?: string }>;
+  onSendWhatsApp: (
+    contractId: string,
+    phone: string,
+  ) => Promise<{ whatsappDeliveryStatus?: string }>;
 }
 
 type ModalStep = 'preview' | 'signature' | 'processing' | 'done';
@@ -62,6 +65,19 @@ export function ContractModal({
   const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
   const [contractId, setContractId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const customerEmail =
+    customer?.email ||
+    (customer?.contacts || [])
+      .filter((contact) => contact.type === 'email')
+      .sort((a, b) => Number(b.is_primary || 0) - Number(a.is_primary || 0))[0]?.value ||
+    null;
+  const customerPhone =
+    customer?.main_phone ||
+    (customer?.contacts || [])
+      .filter((contact) => ['whatsapp', 'mobile', 'phone'].includes(contact.type))
+      .sort((a, b) => Number(b.is_primary || 0) - Number(a.is_primary || 0))[0]?.value ||
+    null;
 
   const handlePrint = useCallback(() => {
     window.print();
@@ -101,8 +117,17 @@ export function ContractModal({
     }
   }, [rental, signatureBase64, onGenerateContract]);
 
+  // PDF/e-mail/WhatsApp are only available after the contract is signed. When
+  // triggered from the preview, guide the user to the signature step first.
+  const ensureContract = useCallback(() => {
+    if (contractId) return true;
+    toast('Assine digitalmente para gerar o contrato.', { icon: '✍' });
+    setStep('signature');
+    return false;
+  }, [contractId]);
+
   const handleDownload = useCallback(async () => {
-    if (!contractId) return;
+    if (!ensureContract() || !contractId) return;
     setLoading(true);
     try {
       // Authenticated fetch: a plain <a href> would not send the Bearer token
@@ -118,39 +143,53 @@ export function ContractModal({
     } finally {
       setLoading(false);
     }
-  }, [contractId, rental]);
+  }, [contractId, ensureContract, rental]);
 
   const handleSendEmail = useCallback(async () => {
-    if (!contractId || !customer?.email) {
+    if (!ensureContract() || !contractId) return;
+    if (!customerEmail) {
       toast.error('Email do cliente não disponível');
       return;
     }
     setLoading(true);
     try {
-      await onSendEmail(contractId, customer.email);
-      toast.success('Contrato enviado por email!');
+      const result = await onSendEmail(contractId, customerEmail);
+      if (result.emailDeliveryStatus === 'failed') {
+        toast.error(
+          'Contrato emitido, mas não foi possível enviá-lo por e-mail. Tente novamente mais tarde.',
+        );
+      } else {
+        toast.success('Contrato enviado por email!');
+      }
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Erro ao enviar email'));
     } finally {
       setLoading(false);
     }
-  }, [contractId, customer?.email, onSendEmail]);
+  }, [contractId, customerEmail, ensureContract, onSendEmail]);
 
   const handleSendWhatsApp = useCallback(async () => {
-    if (!contractId || !customer?.main_phone) {
+    if (!ensureContract() || !contractId) return;
+    if (!customerPhone) {
       toast.error('Telefone do cliente não disponível');
       return;
     }
     setLoading(true);
     try {
-      await onSendWhatsApp(contractId, customer.main_phone);
-      toast.success('Contrato enviado por WhatsApp!');
+      const result = await onSendWhatsApp(contractId, customerPhone);
+      if (result.whatsappDeliveryStatus === 'failed') {
+        toast.error(
+          'Contrato emitido, mas não foi possível enviá-lo pelo WhatsApp. Tente novamente mais tarde.',
+        );
+      } else {
+        toast.success('Contrato enviado por WhatsApp!');
+      }
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Erro ao enviar WhatsApp'));
     } finally {
       setLoading(false);
     }
-  }, [contractId, customer?.main_phone, onSendWhatsApp]);
+  }, [contractId, customerPhone, ensureContract, onSendWhatsApp]);
 
   const handleBackToPreview = useCallback(() => {
     setStep('preview');
@@ -256,12 +295,12 @@ export function ContractModal({
                 <button onClick={handleDownload} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2">
                   ⬇ Baixar PDF
                 </button>
-                {customer?.email && (
+                {customerEmail && (
                   <button onClick={handleSendEmail} disabled={loading} className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 flex items-center gap-2">
                     📧 Enviar Email
                   </button>
                 )}
-                {customer?.main_phone && (
+                {customerPhone && (
                   <button onClick={handleSendWhatsApp} disabled={loading} className="px-6 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 flex items-center gap-2">
                     💬 WhatsApp
                   </button>
