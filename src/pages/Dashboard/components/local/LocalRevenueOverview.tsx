@@ -129,8 +129,11 @@ export function LocalRevenueOverview({
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-              Inadimplência
+            <p
+              className="text-[10px] font-bold uppercase tracking-wider text-gray-400"
+              title="Percentual da carteira em aberto que está vencido"
+            >
+              Inadimpl. carteira
             </p>
             <p className="mt-1 text-sm font-bold text-gray-900">
               {formatPercent(summary.delinquency_rate)}

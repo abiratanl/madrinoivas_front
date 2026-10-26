@@ -55,11 +55,13 @@ const dashboardData: LocalDashboardData = {
     revenue_current_month: 18500,
     total_rentals: 24,
     active_rentals: 6,
+    contracted_revenue: 48000,
+    average_ticket: 2000,
     late_rentals: 1,
     pending_receivables: 5600,
     overdue_receivables: 900,
     overdue_installments: 1,
-    delinquency_rate: 2.14,
+    delinquency_rate: 16.07,
     total_customers: 18,
     total_products: 30,
     available_products: 20,
@@ -72,9 +74,23 @@ const dashboardData: LocalDashboardData = {
     active_products: 30,
     occupancy_rate: 30,
   },
-  rentals_by_status: [],
-  revenue_by_month: [],
-  payments_by_method: [],
+  rentals_by_status: [
+    { status: 'reserved', count: 5 },
+    { status: 'picked_up', count: 7 },
+    { status: 'returned', count: 10 },
+    { status: 'late', count: 1 },
+    { status: 'cancelled', count: 1 },
+  ],
+  revenue_by_month: [
+    { month: '2026-08', revenue: 12000 },
+    { month: '2026-09', revenue: 15000 },
+    { month: '2026-10', revenue: 15000 },
+  ],
+  payments_by_method: [
+    { payment_method: 'pix', count: 8, total: 24000 },
+    { payment_method: 'credit_card', count: 5, total: 15000 },
+    { payment_method: 'cash', count: 2, total: 3000 },
+  ],
   top_products: [],
   recent_rentals: [],
   upcoming_rentals: [],
@@ -212,9 +228,12 @@ describe('LocalDashboard', () => {
     expect(await screen.findByText('Dashboard da Loja')).toBeInTheDocument();
     expect(screen.getByText('Faturamento da loja')).toBeInTheDocument();
     expect(screen.getByText('Recebimentos de hoje')).toBeInTheDocument();
-    expect(screen.getByText('Pix')).toBeInTheDocument();
+    expect(screen.getAllByText('Pix').length).toBeGreaterThan(0);
     expect(screen.getByText('Cartão')).toBeInTheDocument();
-    expect(screen.getByText('Dinheiro')).toBeInTheDocument();
+    expect(screen.getAllByText('Dinheiro').length).toBeGreaterThan(0);
+    expect(screen.getByText('Evolução da Loja')).toBeInTheDocument();
+    expect(screen.getByText('Formas de Pagamento')).toBeInTheDocument();
+    expect(screen.getByText('Status dos Aluguéis')).toBeInTheDocument();
     expect(screen.getByText('Operações de hoje')).toBeInTheDocument();
     expect(screen.getByText('Retiradas')).toBeInTheDocument();
     expect(screen.getByText('Devoluções')).toBeInTheDocument();

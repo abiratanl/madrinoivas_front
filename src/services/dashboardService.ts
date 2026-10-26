@@ -135,6 +135,7 @@ export interface DashboardStorePerformance {
   total_rentals: number;
   active_rentals: number;
   revenue: number;
+  contracted_value: number;
   average_ticket: number;
   total_products: number;
   active_products: number;
@@ -150,6 +151,8 @@ export interface GeneralDashboardSummary {
   revenue_current_month: number;
   total_rentals: number;
   active_rentals: number;
+  contracted_revenue: number;
+  average_ticket: number;
   pending_receivables: number;
   overdue_receivables: number;
   overdue_installments: number;
@@ -284,6 +287,8 @@ export interface LocalDashboardSummary {
   revenue_current_month: number;
   total_rentals: number;
   active_rentals: number;
+  contracted_revenue: number;
+  average_ticket: number;
   late_rentals: number;
   pending_receivables: number;
   overdue_receivables: number;

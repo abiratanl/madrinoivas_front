@@ -6,7 +6,10 @@ import {
   type DashboardPeriod,
   type LocalDashboard as LocalDashboardData,
 } from '@/services/dashboardService';
+import { PaymentMethodMix } from './components/PaymentMethodMix';
 import { PeriodSelector } from './components/PeriodSelector';
+import { RentalStatusOverview } from './components/RentalStatusOverview';
+import { RevenueTrend } from './components/RevenueTrend';
 import { AvailabilityOverview } from './components/local/AvailabilityOverview';
 import { LocalDashboardSkeleton } from './components/local/LocalDashboardSkeleton';
 import { LocalReceivables } from './components/local/LocalReceivables';
@@ -142,6 +145,17 @@ function LocalDashboard() {
               monthlyGoal={monthlyGoal}
             />
             <TodayReceipts receipts={data.today_receipts} />
+          </div>
+
+          <RevenueTrend
+            data={data.revenue_by_month}
+            title="Evolução da Loja"
+            description="Receita confirmada mês a mês nesta unidade"
+          />
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <PaymentMethodMix methods={data.payments_by_method} />
+            <RentalStatusOverview statuses={data.rentals_by_status} />
           </div>
 
           <TodayOperations operations={data.today_operations} />

@@ -21,18 +21,34 @@ const dashboardData: GeneralDashboardData = {
     revenue_current_month: 5000,
     total_rentals: 10,
     active_rentals: 4,
+    contracted_revenue: 25000,
+    average_ticket: 2500,
     pending_receivables: 8000,
     overdue_receivables: 1200,
     overdue_installments: 2,
-    delinquency_rate: 4.8,
+    delinquency_rate: 15,
     total_customers: 20,
     total_products: 40,
-    total_stores: 2,
+    total_stores: 3,
     active_stores: 2,
   },
-  rentals_by_status: [],
-  revenue_by_month: [],
-  payments_by_method: [],
+  rentals_by_status: [
+    { status: 'reserved', count: 3 },
+    { status: 'picked_up', count: 4 },
+    { status: 'returned', count: 2 },
+    { status: 'late', count: 1 },
+    { status: 'cancelled', count: 1 },
+  ],
+  revenue_by_month: [
+    { month: '2026-08', revenue: 7000 },
+    { month: '2026-09', revenue: 9000 },
+    { month: '2026-10', revenue: 9000 },
+  ],
+  payments_by_method: [
+    { payment_method: 'pix', count: 6, total: 14000 },
+    { payment_method: 'credit_card', count: 3, total: 9000 },
+    { payment_method: 'cash', count: 1, total: 2000 },
+  ],
   stores: [
     {
       id: 'store-1',
@@ -43,6 +59,7 @@ const dashboardData: GeneralDashboardData = {
       total_rentals: 6,
       active_rentals: 2,
       revenue: 16000,
+      contracted_value: 16000,
       average_ticket: 2666.67,
       total_products: 25,
       active_products: 20,
@@ -51,6 +68,25 @@ const dashboardData: GeneralDashboardData = {
       items_rented: 12,
       turnover_rate: 0.6,
       total_customers: 12,
+    },
+    {
+      id: 'store-inactive',
+      name: 'Loja Inativa',
+      city: 'São Paulo',
+      state: 'SP',
+      is_active: false,
+      total_rentals: 2,
+      active_rentals: 0,
+      revenue: 5000,
+      contracted_value: 4000,
+      average_ticket: 2000,
+      total_products: 10,
+      active_products: 8,
+      occupied_products: 0,
+      occupancy_rate: 0,
+      items_rented: 2,
+      turnover_rate: 0.25,
+      total_customers: 2,
     },
   ],
   top_products: [
@@ -143,8 +179,11 @@ describe('GeneralDashboard', () => {
     render(<GeneralDashboard />);
 
     expect(await screen.findByText('Dashboard Geral')).toBeInTheDocument();
-    expect(await screen.findByText('Faturamento Total')).toBeInTheDocument();
+    expect(await screen.findByText('Faturamento Recebido')).toBeInTheDocument();
     expect(screen.getByText('Ticket Médio')).toBeInTheDocument();
+    expect(screen.getByText('Evolução do Faturamento')).toBeInTheDocument();
+    expect(screen.getByText('Formas de Pagamento')).toBeInTheDocument();
+    expect(screen.getByText('Status dos Aluguéis')).toBeInTheDocument();
     expect(screen.getByText('Ranking de Faturamento')).toBeInTheDocument();
     expect(screen.getByText('Previsão de Recebíveis')).toBeInTheDocument();
     expect(screen.getByText('Top Coleções')).toBeInTheDocument();
@@ -153,6 +192,7 @@ describe('GeneralDashboard', () => {
     expect(screen.getAllByText('Vestido Noiva Clássico').length).toBeGreaterThan(0);
     expect(screen.getByText('Noivas Clássicas')).toBeInTheDocument();
     expect(screen.getByText('Vestido Festa Antigo')).toBeInTheDocument();
+    expect(screen.queryByText('Loja Inativa')).not.toBeInTheDocument();
   });
 
   it('refetches the dashboard when the period changes', async () => {

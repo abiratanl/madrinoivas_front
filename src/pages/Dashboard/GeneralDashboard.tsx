@@ -8,8 +8,11 @@ import {
 import { DashboardSkeleton } from './components/DashboardSkeleton';
 import { InventoryInsights } from './components/InventoryInsights';
 import { KpiCards } from './components/KpiCards';
+import { PaymentMethodMix } from './components/PaymentMethodMix';
 import { PeriodSelector } from './components/PeriodSelector';
 import { ReceivablesForecast } from './components/ReceivablesForecast';
+import { RentalStatusOverview } from './components/RentalStatusOverview';
+import { RevenueTrend } from './components/RevenueTrend';
 import { StoreRevenueRanking } from './components/StoreRevenueRanking';
 import { TopCollections } from './components/TopCollections';
 import { TopRentedDresses } from './components/TopRentedDresses';
@@ -100,9 +103,16 @@ function GeneralDashboard() {
         <div className="space-y-6">
           <KpiCards summary={data.summary} comparison={data.comparison} />
 
+          <RevenueTrend data={data.revenue_by_month} />
+
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <StoreRevenueRanking stores={data.stores} />
             <ReceivablesForecast forecast={data.receivables_forecast} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <PaymentMethodMix methods={data.payments_by_method} />
+            <RentalStatusOverview statuses={data.rentals_by_status} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">

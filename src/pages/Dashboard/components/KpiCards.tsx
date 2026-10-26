@@ -63,8 +63,6 @@ interface KpiCardsProps {
 }
 
 export function KpiCards({ summary, comparison }: KpiCardsProps) {
-  const averageTicket =
-    summary.total_rentals > 0 ? summary.total_revenue / summary.total_rentals : 0;
   const growth = comparison.growth_percentage;
   const growthHint =
     growth === null
@@ -73,16 +71,16 @@ export function KpiCards({ summary, comparison }: KpiCardsProps) {
 
   const cards: KpiCardProps[] = [
     {
-      title: 'Faturamento Total',
+      title: 'Faturamento Recebido',
       value: formatCurrency(summary.total_revenue),
-      hint: `${formatNumber(summary.total_rentals)} aluguéis • ${growthHint}`,
+      hint: `${formatNumber(summary.total_rentals)} aluguéis criados • ${growthHint}`,
       icon: Wallet,
       tone: 'rose',
     },
     {
       title: 'Ticket Médio',
-      value: formatCurrency(averageTicket),
-      hint: 'Faturamento médio por aluguel',
+      value: formatCurrency(summary.average_ticket),
+      hint: 'Valor médio contratado por aluguel',
       icon: TrendingUp,
       tone: 'blue',
     },
@@ -96,7 +94,7 @@ export function KpiCards({ summary, comparison }: KpiCardsProps) {
     {
       title: 'Inadimplência',
       value: formatCurrency(summary.overdue_receivables),
-      hint: `${formatPercent(summary.delinquency_rate)} do faturamento • ${formatNumber(summary.overdue_installments)} parcela(s) vencida(s)`,
+      hint: `${formatPercent(summary.delinquency_rate)} da carteira em aberto • ${formatNumber(summary.overdue_installments)} parcela(s) vencida(s)`,
       icon: AlertTriangle,
       tone: 'red',
     },

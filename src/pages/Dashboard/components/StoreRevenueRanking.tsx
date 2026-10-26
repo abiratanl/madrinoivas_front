@@ -14,7 +14,9 @@ interface StoreRevenueRankingProps {
 }
 
 export function StoreRevenueRanking({ stores }: StoreRevenueRankingProps) {
-  const sortedStores = [...stores].sort(
+  const sortedStores = stores
+    .filter((store) => store.is_active)
+    .sort(
     (a, b) =>
       b.revenue - a.revenue ||
       b.total_rentals - a.total_rentals ||
@@ -32,7 +34,7 @@ export function StoreRevenueRanking({ stores }: StoreRevenueRankingProps) {
           </div>
           <div>
             <h2 className="text-sm font-bold text-gray-900">Ranking de Faturamento</h2>
-            <p className="text-xs text-gray-500">Desempenho por loja no período</p>
+            <p className="text-xs text-gray-500">Receita confirmada por loja ativa</p>
           </div>
         </div>
         <span className="rounded-full bg-gray-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">
@@ -42,7 +44,7 @@ export function StoreRevenueRanking({ stores }: StoreRevenueRankingProps) {
 
       {sortedStores.length === 0 ? (
         <div className="px-5 py-10 text-center text-sm text-gray-500">
-          Nenhuma loja encontrada para o período selecionado.
+          Nenhuma loja ativa encontrada para o período selecionado.
         </div>
       ) : (
         <div className="overflow-x-auto">

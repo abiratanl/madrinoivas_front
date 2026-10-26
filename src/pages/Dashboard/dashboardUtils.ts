@@ -39,6 +39,15 @@ export const formatDate = (value?: string | null) => {
   return format(date, 'dd/MM/yyyy', { locale: ptBR });
 };
 
+export const formatMonthShort = (value: string) => {
+  if (!/^\d{4}-\d{2}$/.test(value)) return value;
+
+  const [year, month] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, 1);
+
+  return format(date, 'MMM/yy', { locale: ptBR }).replace('.', '');
+};
+
 export const formatShortDate = (value?: string | null) => {
   const date = parseDate(value);
   if (!date) return '-';
