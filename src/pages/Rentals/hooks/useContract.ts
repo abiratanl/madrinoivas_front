@@ -16,12 +16,12 @@ export function useContract() {
 
   // Envia contrato por email
   const sendContractEmail = useCallback(async (contractId: string, email: string) => {
-    await rentalService.sendContractEmail(contractId, { email });
+    return rentalService.sendContractEmail(contractId, { email });
   }, []);
 
   // Envia contrato por WhatsApp
   const sendContractWhatsApp = useCallback(async (contractId: string, phone: string) => {
-    await rentalService.sendContractWhatsApp(contractId, { phone });
+    return rentalService.sendContractWhatsApp(contractId, { phone });
   }, []);
 
   // Download direto do PDF (fallback se backend não tiver endpoint)

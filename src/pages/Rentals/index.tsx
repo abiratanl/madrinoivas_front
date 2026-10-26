@@ -7,7 +7,12 @@ import { customerService } from '../../services/customerService';
 import type { Customer } from '../../types/customer';
 import type { Product } from '../../services/productService';
 import { issueReceipt } from '../../services/receiptService';
-import { getStoreMainPhone, getStoreMainEmail } from '../../services/storeService';
+import {
+  storeService,
+  getStoreMainPhone,
+  getStoreMainEmail,
+  type Store,
+} from '../../services/storeService';
 import { RentalModal } from './components/RentalModal';
 import { ContractModal } from './components/ContractModal';
 import { ReturnModal } from '../../components/rentals/ReturnModal';
@@ -24,6 +29,22 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const formatBRL = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+const buildStoreData = (store: Store | null) => {
+  const primaryAddress = store?.addresses?.[0];
+  return {
+    name: store?.name || 'Madrinoivas',
+    address: store?.address || '',
+    city: store?.city || primaryAddress?.city || '',
+    state: store?.state || primaryAddress?.state || '',
+    cnpj: store?.cnpj || '',
+    phone: getStoreMainPhone(store) || '(00) 0000-0000',
+    email: getStoreMainEmail(store) || 'contato@madrinoivas.com',
+    owner_name: store?.owner_name,
+    owner_signature_url: store?.owner_signature_url,
+    digital_signature_base64: store?.digital_signature_base64,
+  };
+};
 
 const INSTALLMENT_STATUS_LABELS: Record<string, string> = {
   pending: 'Pendente',
@@ -543,24 +564,11 @@ export default function Rentals() {
     loadRentals({ status: statusFilter || undefined });
   };
   
-  // Store data for contract
-  const storeData = {
-    name: selectedStore?.name || 'Madrinoivas',
-    address: selectedStore?.address || 'Endereço não informado',
-    city: selectedStore?.city || 'Cidade',
-    state: selectedStore?.state || 'UF',
-    cnpj: selectedStore?.cnpj || '00.000.000/0000-00',
-    phone: getStoreMainPhone(selectedStore) || '(00) 0000-0000',
-    email: getStoreMainEmail(selectedStore) || 'contato@madrinoivas.com',
-    owner_name: selectedStore?.owner_name,
-    owner_signature_url: selectedStore?.owner_signature_url,
-    digital_signature_base64: selectedStore?.digital_signature_base64,
-  };
-
   // Contract modal state
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [contractRental, setContractRental] = useState<Rental | null>(null);
   const [contractCustomer, setContractCustomer] = useState<Customer | undefined>(undefined);
+  const [contractStore, setContractStore] = useState<Store | null>(null);
   const [contractItems, setContractItems] = useState<
     { product: Product; quantity: number; unit_price: number }[]
   >([]);
@@ -588,6 +596,8 @@ export default function Rentals() {
 
   const openContractModal = async (id: string) => {
     try {
+      setContractStore(null);
+
       // Load rental details if not in cache
       let rental = allRentals.find(r => r.id === id);
       if (!rental) return;
@@ -600,17 +610,27 @@ export default function Rentals() {
 
       if (!rental) return; // TypeScript narrowing
 
-      const customerSummary = customers.find(c => 
-        c.name.toLowerCase().trim() === (rental.customer_name || '').toLowerCase().trim()
-      );
+      const customerSummary =
+        customers.find(c => String(c.id) === String(rental.customer_id)) ||
+        customers.find(
+          c =>
+            c.name.toLowerCase().trim() ===
+            (rental.customer_name || '').toLowerCase().trim(),
+        );
 
-      // Load full customer data (addresses/contacts) and payment history in parallel
-      const [fullCustomer, payments] = await Promise.all([
+      // Load full customer, payment history and the rental's store in parallel.
+      // The store is always read from the database so contract fields such as
+      // CNPJ, city and state reflect the rental's actual store.
+      const [fullCustomer, payments, storeResponse] = await Promise.all([
         customerSummary?.id
           ? customerService.getById(customerSummary.id).catch(() => customerSummary)
           : Promise.resolve(customerSummary),
         paymentService.getByRental(rental.id).catch(() => [] as Payment[]),
+        rental.store_id
+          ? storeService.getById(rental.store_id).catch(() => null)
+          : Promise.resolve(null),
       ]);
+      const fullStore = (storeResponse?.data ?? storeResponse) as Store | null;
 
       // Build items with product details
       const itemsWithProducts = (rental.items || []).map((item) => {
@@ -634,6 +654,7 @@ export default function Rentals() {
 
       setContractRental(rental);
       setContractCustomer(fullCustomer);
+      setContractStore(fullStore);
       setContractItems(itemsWithProducts);
       setContractPayments(payments);
       setIsContractModalOpen(true);
@@ -1098,7 +1119,7 @@ export default function Rentals() {
         onClose={() => setIsContractModalOpen(false)}
         rental={contractRental}
         customer={contractCustomer}
-        store={storeData}
+        store={buildStoreData(contractStore ?? selectedStore)}
         items={contractItems}
         payments={contractPayments}
         onGenerateContract={async (rentalId, signatureBase64) => {
@@ -1109,10 +1130,10 @@ export default function Rentals() {
           };
         }}
         onSendEmail={async (contractId, email) => {
-          await rentalService.sendContractEmail(contractId, { email });
+          return rentalService.sendContractEmail(contractId, { email });
         }}
         onSendWhatsApp={async (contractId, phone) => {
-          await rentalService.sendContractWhatsApp(contractId, { phone });
+          return rentalService.sendContractWhatsApp(contractId, { phone });
         }}
       />
 

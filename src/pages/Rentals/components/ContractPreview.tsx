@@ -1,4 +1,3 @@
-import React from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { Rental } from '../../../services/rentalService';
@@ -11,9 +10,11 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = Object.fromEntries(
   PAYMENT_METHOD_OPTIONS.map((o) => [o.value, o.label]),
 );
 
-// Lessor (Madri Noivas) legal identification, mirroring the backend contractService fallbacks
+// Lessor (Madri Noivas) legal identification, mirroring the backend contractService
 const LESSOR_LEGAL_NAME = 'TERESA FRANCA DE OLIVEIRA FRANCISCO (ME)';
+const LESSOR_TRADE_NAME = 'MADRI NOIVAS TRAJES A RIGOR';
 const LESSOR_CNPJ = '07.846.246/0001-28';
+const LESSOR_ADDRESS = 'Rua Dr. Castro Santos, nº 98, Centro, Guaratinguetá - SP, CEP 12505-010';
 const LESSOR_REPRESENTATIVE = 'Teresa França de Oliveira Francisco';
 const CONTRACT_CITY = 'Guaratinguetá';
 const CONTRACT_STATE = 'SP';
@@ -50,24 +51,24 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-function formatDate(dateStr: string) {
-  return format(new Date(dateStr), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+// Date-only values (rental start/end) must not be shifted by the UTC offset.
+function parseDateValue(value: string) {
+  const datePart = value.slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(datePart);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  return new Date(value);
 }
 
-function formatDateTime(dateStr: string) {
-  return format(new Date(dateStr), "dd/MM/yyyy',' HH:mm", { locale: ptBR });
+function formatDateLong(dateStr?: string | null) {
+  if (!dateStr) return '-';
+  return format(parseDateValue(dateStr), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 }
 
-function formatAddressLine(address: {
-  street?: string;
-  number?: string;
-  complement?: string | null;
-  neighborhood?: string | null;
-}) {
-  const parts = [address.street, address.number ? `nº ${address.number}` : null];
-  if (address.complement) parts.push(address.complement);
-  if (address.neighborhood) parts.push(`- ${address.neighborhood}`);
-  return parts.filter(Boolean).join(' ');
+function formatFittingDate(dateStr?: string | null) {
+  if (!dateStr) return 'A definir';
+  return format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
 }
 
 // Pick the customer's default address (first as fallback)
@@ -92,14 +93,17 @@ function getCustomerEmail(customer?: Customer) {
   return contact?.value || customer?.email || null;
 }
 
-function getItemDescription(item: ContractPreviewProps['items'][0]) {
-  const { product } = item;
-  const parts = [];
-  if (product.name) parts.push(product.name);
-  if (product.color) parts.push(product.color);
-  if (product.size) parts.push(`tamanho ${product.size}`);
-  if (product.brand) parts.push(product.brand);
-  return parts.join(', ');
+function getItemsDescription(items: ContractPreviewProps['items']) {
+  const descriptions = items.map(({ product, quantity }) => {
+    const details = [
+      product.name,
+      product.color ? `cor ${product.color}` : null,
+      product.size ? `tamanho ${product.size}` : null,
+      product.brand ? `marca ${product.brand}` : null,
+    ].filter(Boolean);
+    return `${details.join(', ')} (Qtd: ${quantity || 1})`;
+  });
+  return descriptions.length > 0 ? descriptions.join('; ') : '-';
 }
 
 export function ContractPreview({
@@ -114,192 +118,334 @@ export function ContractPreview({
   onSendEmail,
   onSendWhatsApp,
 }: ContractPreviewProps) {
-  const depositPaid = rental.deposit_paid || rental.sinal || 0;
-  const balanceDue = (rental.total_price || 0) - depositPaid;
-  const extraDailyRate = rental.extra_daily_rate || rental.daily_rate || 0;
-  const today = new Date();
-
-  const storeCity = store.city || CONTRACT_CITY;
-  const storeState = store.state || CONTRACT_STATE;
-
-  const customerAddress = getCustomerAddress(customer);
-  const lesseeAddressLine = customerAddress
-    ? [
-        formatAddressLine(customerAddress),
-        [customerAddress.city, customerAddress.state].filter(Boolean).join(' - '),
-        customerAddress.zip_code ? `CEP ${customerAddress.zip_code}` : null,
-      ]
-        .filter(Boolean)
-        .join(', ')
-    : null;
-  const lesseePhone = getCustomerPhone(customer);
-  const lesseeEmail = getCustomerEmail(customer);
-  const lesseeQualification = [
-    customer?.name || '________________________________________',
-    customer?.cpf ? `CPF nº ${customer.cpf}` : null,
-    customer?.rg ? `RG nº ${customer.rg}` : null,
-    lesseeAddressLine ? `residente e domiciliada(o) em ${lesseeAddressLine}` : null,
-    lesseePhone ? `telefone ${lesseePhone}` : null,
-    lesseeEmail ? `e-mail ${lesseeEmail}` : null,
-  ]
-    .filter(Boolean)
-    .join(', ');
-
-  // Confirmed payments in chronological order, mirroring the PDF payment history
   const confirmedPayments = (payments || [])
-    .filter((p) => p.status !== 'cancelled')
+    .filter((payment) => payment.status !== 'cancelled')
     .slice()
     .sort((a, b) => new Date(a.paid_at).getTime() - new Date(b.paid_at).getTime());
+  const downPayment =
+    confirmedPayments.find((payment) => payment.type === 'entry') ||
+    confirmedPayments[0] ||
+    null;
+  const downPaymentAmount = downPayment
+    ? parseFloat(String(downPayment.amount || 0))
+    : Number(rental.deposit_paid || rental.sinal || 0);
+  const downPaymentMethod = downPayment
+    ? PAYMENT_METHOD_LABELS[downPayment.payment_method] || downPayment.payment_method
+    : '-';
+
+  const totalAmount = Number(rental.total_amount || rental.total_price || 0);
+  const totalPaid =
+    confirmedPayments.length > 0
+      ? confirmedPayments.reduce(
+        (sum, payment) => sum + parseFloat(String(payment.amount || 0)),
+        0,
+      )
+      : downPaymentAmount;
+  const remainingBalance = Math.max(totalAmount - totalPaid, 0);
+
+  const customerAddress = getCustomerAddress(customer);
+  const lesseeName = customer?.name || rental.customer_name || '-';
+  const lesseeCpf = customer?.cpf || rental.customer_cpf || '-';
+  const lesseeRg = customer?.rg || '-';
+  const lesseePhone = getCustomerPhone(customer) || '-';
+  const lesseeEmail = getCustomerEmail(customer) || '-';
+  const itemsDescription = getItemsDescription(items);
+  const storeCity = store.city || CONTRACT_CITY;
+  const storeState = store.state || CONTRACT_STATE;
+  const lessorCnpj = store.cnpj || LESSOR_CNPJ;
+  const lessorAddress = store.address || LESSOR_ADDRESS;
+  const lessorRepresentative = store.owner_name || LESSOR_REPRESENTATIVE;
 
   return (
-    <div className="contract-preview max-w-3xl mx-auto bg-white p-8 md:p-12 font-serif text-gray-900 leading-relaxed" style={{ fontFamily: 'Georgia, serif' }}>
-      {/* Header - Loja */}
-      <div className="text-center mb-8 border-b-2 border-gray-300 pb-6">
-        <h1 className="text-2xl md:text-3xl font-bold uppercase tracking-wider mb-2">{store.name}</h1>
-        <p className="text-sm text-gray-600">{store.address} - {store.city}/{store.state}</p>
-        <p className="text-sm text-gray-600">CNPJ: {store.cnpj} | Tel: {store.phone} | {store.email}</p>
-      </div>
-
+    <div
+      className="contract-preview max-w-3xl mx-auto bg-white p-8 md:p-12 pb-32 font-serif text-gray-900 leading-relaxed"
+      style={{ fontFamily: 'Georgia, serif' }}
+    >
       {/* Título do Contrato */}
       <div className="text-center mb-8">
-        <h2 className="text-xl font-bold underline decoration-2 underline-offset-4 mb-2">CONTRATO DE LOCAÇÃO DE VESTUÁRIO E ACESSÓRIOS</h2>
-        <p className="text-sm text-gray-500">Contrato Nº: <strong>{rental.id?.slice(0, 8).toUpperCase()}</strong></p>
-      </div>
-
-      {/* Qualificação das Partes */}
-      <div className="mb-6">
-        <h3 className="font-bold text-lg mb-3">Das Partes</h3>
-        <p className="text-sm mb-2">
-          <strong>LOCADORA:</strong> {LESSOR_LEGAL_NAME}, nome fantasia {store.name}, CNPJ nº {store.cnpj || LESSOR_CNPJ}, com sede em {store.address}, neste ato representada por {store.owner_name || LESSOR_REPRESENTATIVE}.
-        </p>
-        <p className="text-sm">
-          <strong>LOCATÁRIA(O):</strong> {lesseeQualification}.
+        <h2 className="text-xl font-bold underline decoration-2 underline-offset-4 mb-2">
+          CONTRATO DE PRESTAÇÃO DE SERVIÇOS E LOCAÇÃO DE TRAJES A RIGOR
+        </h2>
+        <p className="text-sm text-gray-500">
+          Contrato Nº: <strong>{rental.id?.slice(0, 8).toUpperCase()}</strong>
         </p>
       </div>
 
-      {/* Cláusula 1 - Objeto */}
-      <div className="mb-6">
-        <h3 className="font-bold text-lg mb-3">Cláusula 1ª – Do Objeto</h3>
-        <p className="mb-3">O presente contrato tem como objeto a locação da(s) seguinte(s) peça(s) de vestuário/acessório(s):</p>
-        <ul className="list-disc list-inside space-y-2 ml-4">
-          {items.map((item, idx) => (
-            <li key={idx} className="text-sm">
-              <strong>Descrição da peça:</strong> {getItemDescription(item)} (Cor: {item.product.color || 'Não informada'}, Marca: {item.product.brand || 'Não informada'}, Modelo: {item.product.model || 'Não informado'}, Tamanho: {item.product.size || 'Não informado'})
-              <br />
-              <strong>Acessórios inclusos:</strong> {item.product.accessories || 'Nenhum'}
-              <br />
-              <strong>Valor diário:</strong> {formatCurrency(item.unit_price)} | <strong>Valor de venda (extravio):</strong> {formatCurrency(item.product.sale_price || item.unit_price * 10)}
-            </li>
-          ))}
+      <p className="text-sm mb-5">Pelo presente instrumento particular, de um lado:</p>
+
+      {/* LOCADORA */}
+      <div className="mb-5">
+        <h3 className="font-bold text-base mb-2">LOCADORA:</h3>
+        <ul className="list-disc list-inside space-y-1 ml-2 text-sm">
+          <li><strong>Razão Social:</strong> {LESSOR_LEGAL_NAME}</li>
+          <li><strong>Nome Fantasia:</strong> {LESSOR_TRADE_NAME}</li>
+          <li><strong>CNPJ:</strong> {lessorCnpj}</li>
+          <li><strong>Endereço:</strong> {lessorAddress}</li>
+          <li><strong>Representante Legal:</strong> {lessorRepresentative}</li>
         </ul>
       </div>
 
-      {/* Cláusula 2 - Prazo */}
+      <p className="text-sm mb-5">E, de outro lado:</p>
+
+      {/* LOCATÁRIO */}
       <div className="mb-6">
-        <h3 className="font-bold text-lg mb-3">Cláusula 2ª – Do Prazo da Locação</h3>
-        <ul className="list-disc list-inside space-y-2 ml-4 text-sm">
-          <li><strong>Data de Retirada/Entrega:</strong> {formatDate(rental.start_date)}</li>
-          <li><strong>Data de Devolução:</strong> {formatDate(rental.end_date_scheduled)}</li>
-          <li>O prazo de locação é certo e determinado, encerrando-se obrigatoriamente na data de devolução estipulada acima.</li>
+        <h3 className="font-bold text-base mb-2">LOCATÁRIO(A):</h3>
+        <ul className="list-disc list-inside space-y-1 ml-2 text-sm">
+          <li><strong>Nome/Razão Social:</strong> {lesseeName}</li>
+          <li><strong>CPF/CNPJ:</strong> {lesseeCpf}</li>
+          <li><strong>RG:</strong> {lesseeRg}</li>
+          <li>
+            <strong>Endereço:</strong> {customerAddress?.street || '-'}, nº{' '}
+            {customerAddress?.number || '-'} - {customerAddress?.neighborhood || '-'}
+          </li>
+          <li>
+            <strong>Cidade/UF:</strong> {customerAddress?.city || '-'}/
+            {customerAddress?.state || '-'} - CEP: {customerAddress?.zip_code || '-'}
+          </li>
+          <li><strong>Telefone/WhatsApp:</strong> {lesseePhone}</li>
+          <li><strong>E-mail:</strong> {lesseeEmail}</li>
         </ul>
       </div>
 
-      {/* Cláusula 3 - Valor */}
-      <div className="mb-6">
-        <h3 className="font-bold text-lg mb-3">Cláusula 3ª – Do Valor e Forma de Pagamento</h3>
-        <ul className="list-disc list-inside space-y-2 ml-4 text-sm">
-          <li><strong>Valor Total do Aluguel:</strong> {formatCurrency(rental.total_price || 0)}</li>
-          <li><strong>Sinal de Reserva (não reembolsável em caso de desistência):</strong> {formatCurrency(depositPaid)}</li>
-          <li><strong>Restante do pagamento:</strong> {formatCurrency(balanceDue)} — Deverá ser quitado no ato da retirada da peça.</li>
-          {confirmedPayments.length > 0 && (
-            <li>
-              <strong>Pagamentos registrados até a emissão deste contrato:</strong>
-              <ul className="ml-6 mt-1 space-y-1 list-none">
-                {confirmedPayments.map((payment) => (
-                  <li key={payment.id}>
-                    - {formatDateTime(payment.paid_at)} — {PAYMENT_METHOD_LABELS[payment.payment_method] || 'Outro'}: {formatCurrency(Number(payment.amount))}
-                  </li>
-                ))}
-              </ul>
-            </li>
-          )}
-        </ul>
+      <p className="text-sm mb-6 text-justify">
+        As partes acima qualificadas têm entre si, justo e contratado, o presente Contrato de
+        Locação de Trajes a Rigor, mediante as cláusulas e condições a seguir descritas:
+      </p>
+
+      {/* Cláusula Primeira */}
+      <div className="mb-5">
+        <h3 className="font-bold text-base mb-2 uppercase">Cláusula Primeira – Do Objeto</h3>
+        <p className="text-sm text-justify mb-2">
+          O presente contrato tem por objeto a locação do(s) traje(s) e acessório(s)
+          discriminado(s) abaixo, para uso exclusivo do(a) LOCATÁRIO(A) na data estipulada neste
+          instrumento:
+        </p>
+        <p className="text-sm text-justify ml-4">
+          <strong>• Descrição dos Trajes / Itens:</strong> {itemsDescription}
+        </p>
       </div>
 
-      {/* Cláusula 4 - Obrigações */}
-      <div className="mb-6">
-        <h3 className="font-bold text-lg mb-3">Cláusula 4ª – Das Obrigações da Locatária(O)</h3>
-        <ol className="list-decimal list-inside space-y-2 ml-4 text-sm">
-          <li>Utilizar a peça com cautela, evitando danos, manchas severas, rasgos ou alterações (como barras ou ajustes não autorizados).</li>
-          <li>Não lavar ou passar a peça, devendo devolvê-la nas mesmas condições em que foi recebida.</li>
-          <li>Devolver o produto no prazo estabelecido na Cláusula 2ª.</li>
+      {/* Cláusula Segunda */}
+      <div className="mb-5">
+        <h3 className="font-bold text-base mb-2 uppercase">
+          Cláusula Segunda – Do Cronograma da Locação
+        </h3>
+        <p className="text-sm text-justify mb-2">
+          A locação obedecerá rigorosamente às seguintes datas e prazos agendados:
+        </p>
+        <ol className="list-decimal list-inside space-y-1 ml-4 text-sm">
+          <li>
+            <strong>Data da Retirada:</strong> {formatDateLong(rental.start_date)}
+          </li>
+          <li>
+            <strong>Data/Hora Agendada para a Prova:</strong>{' '}
+            {formatFittingDate(rental.fitting_date)}
+          </li>
+          <li>
+            <strong>Data Prevista para Devolução:</strong>{' '}
+            {formatDateLong(rental.end_date_scheduled)}
+          </li>
+        </ol>
+        <p className="text-sm text-justify mt-2">
+          <strong>Parágrafo Único:</strong> O(A) LOCATÁRIO(A) compromete-se a comparecer na data
+          agendada para a prova, sob pena de inviabilizar os ajustes necessários no traje para a
+          data do evento.
+        </p>
+      </div>
+
+      {/* Cláusula Terceira */}
+      <div className="mb-5">
+        <h3 className="font-bold text-base mb-2 uppercase">
+          Cláusula Terceira – Do Preço e Condicionamento Financeiro
+        </h3>
+        <p className="text-sm text-justify mb-2">
+          O valor total desta locação e o plano de pagamento pactuado estão definidos no seguinte
+          resumo financeiro:
+        </p>
+        <ul className="list-disc list-inside space-y-1 ml-4 text-sm">
+          <li><strong>Valor Total do Aluguel:</strong> {formatCurrency(totalAmount)}</li>
+          <li>
+            <strong>Sinal / Entrada Recebido:</strong> {formatCurrency(downPaymentAmount)} (Forma
+            de Pagamento: {downPaymentMethod})
+          </li>
+          <li><strong>Saldo Devedor Restante:</strong> {formatCurrency(remainingBalance)}</li>
+        </ul>
+        <p className="text-sm text-justify mt-2">
+          <strong>Parágrafo Primeiro:</strong> O valor referente ao Sinal/Entrada tem caráter
+          confirmatório da reserva. Em caso de desistência imotivada por parte do(a) LOCATÁRIO(A),
+          o valor do sinal cobrirá os custos de reserva de agenda do traje e não será restituído.
+        </p>
+        <p className="text-sm text-justify mt-1">
+          <strong>Parágrafo Segundo:</strong> O saldo devedor restante deverá ser integralmente
+          quitado até a data de retirada do traje, sob pena de retenção do bem até a efetiva
+          quitação.
+        </p>
+      </div>
+
+      {/* Cláusula Quarta */}
+      <div className="mb-5">
+        <h3 className="font-bold text-base mb-2 uppercase">Cláusula Quarta – Da Conservação e Danos</h3>
+        <p className="text-sm text-justify">
+          O(A) LOCATÁRIO(A) declara receber o(s) traje(s) em perfeitas condições de uso,
+          higienizado(s) e sem defeitos aparentes, comprometendo-se a devolvê-lo(s) nas mesmas
+          condições.
+        </p>
+        <p className="text-sm text-justify mt-2">
+          <strong>Parágrafo Único:</strong> Danos irreparáveis, manchas definitivas (tintas,
+          queimaduras de cigarro/vela), rasgos ou extravio total do traje obrigarão o(a)
+          LOCATÁRIO(A) ao pagamento do valor comercial de venda do item, descontados os valores já
+          pagos no aluguel.
+        </p>
+      </div>
+
+      {/* Cláusula Quinta */}
+      <div className="mb-5">
+        <h3 className="font-bold text-base mb-2 uppercase">Cláusula Quinta – Atraso na Devolução</h3>
+        <p className="text-sm text-justify">
+          A não devolução do traje na data limite estabelecida na Cláusula Segunda (
+          {formatDateLong(rental.end_date_scheduled)}) sujeitará o(a) LOCATÁRIO(A) ao pagamento de
+          multa diária correspondente a 10% (dez por cento) sobre o valor total do contrato por dia
+          de atraso, sem prejuízo de perdas e danos caso o atraso comprometa a locação do mesmo
+          traje para outro cliente.
+        </p>
+      </div>
+
+      {/* Cláusula Sexta */}
+      <div className="mb-5">
+        <h3 className="font-bold text-base mb-2 uppercase">
+          Cláusula Sexta – Proteção e Tratamento de Dados (LGPD)
+        </h3>
+        <p className="text-sm text-justify mb-2">
+          Em conformidade com a Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018 -
+          LGPD):
+        </p>
+        <ol className="list-decimal list-inside space-y-1 ml-4 text-sm text-justify">
+          <li>
+            A LOCADORA coleta e armazena os dados pessoais do(a) LOCATÁRIO(A) (Nome, CPF, RG,
+            Endereço, Telefone e E-mail) exclusivamente para fins de execução deste contrato,
+            emissão de comprovantes financeiros, identificação do(a) LOCATÁRIO(A) e contato
+            operacional referente à prova e devolução dos trajes.
+          </li>
+          <li>
+            A LOCADORA compromete-se a adotar medidas de segurança administrativas e tecnológicas
+            para proteger os dados pessoais do(a) LOCATÁRIO(A) contra acessos não autorizados ou
+            vazamentos.
+          </li>
+          <li>
+            Os dados coletados não serão compartilhados com terceiros, exceto quando estritamente
+            necessário para cumprimento de obrigação legal ou cobrança judicial/extrajudicial em
+            caso de inadimplemento.
+          </li>
         </ol>
       </div>
 
-      {/* Cláusula 5 - Atrasos, Danos e Extravio */}
-      <div className="mb-6">
-        <h3 className="font-bold text-lg mb-3">Cláusula 5ª – Atrasos, Danos e Extravio</h3>
-        <ul className="list-disc list-inside space-y-2 ml-4 text-sm">
-          <li><strong>Atraso na Devolução:</strong> Será cobrada uma taxa de diária adicional no valor de {formatCurrency(extraDailyRate)} por dia de atraso.</li>
-          <li><strong>Danos à Peça:</strong> Se houverem danos reparáveis (manchas profundas ou rasgos), a Locatária(O) arcará com o custo do conserto/lavagem especializada. Caso o dano seja irreparável ou ocorra extravio/roubo, será cobrado o valor integral de venda da peça descrito pela Locadora.</li>
-        </ul>
+      {/* Cláusula Sétima */}
+      <div className="mb-5">
+        <h3 className="font-bold text-base mb-2 uppercase">
+          Cláusula Sétima – Da Validade da Assinatura Eletrônica / Digitalizada
+        </h3>
+        <p className="text-sm text-justify">
+          As partes expressamente concordam e reconhecem a validade, integridade e eficácia
+          jurídica deste instrumento assinado por meio eletrônico, digitalizado ou mediante
+          aplicação de imagem da assinatura do representante legal da LOCADORA, nos termos do art.
+          10, § 2º, da Medida Provisória nº 2.200-2/2001 e da Lei nº 14.063/2020, reconhecendo-o
+          como título executivo extrajudicial bastante para todos os fins de direito.
+        </p>
       </div>
 
-      {/* Cláusula 6 - Foro */}
-      <div className="mb-10">
-        <h3 className="font-bold text-lg mb-3">Cláusula 6ª – Do Foro</h3>
-        <p className="text-sm">Fica eleito o foro da Comarca de <strong>{storeCity} - {storeState}</strong> para dirimir quaisquer dúvidas decorrentes deste contrato.</p>
+      {/* Cláusula Oitava */}
+      <div className="mb-8">
+        <h3 className="font-bold text-base mb-2 uppercase">Cláusula Oitava – Do Foro</h3>
+        <p className="text-sm text-justify">
+          Para dirimir quaisquer controvérsias oriundas do presente contrato, as partes elegem o
+          Foro da Comarca de {storeCity} - {storeState}, com renúncia expressa a qualquer outro, por
+          mais privilegiado que seja.
+        </p>
+      </div>
+
+      <p className="text-sm text-justify mb-3">
+        E, por estarem assim justos e contratados, assinam o presente instrumento para que produza
+        seus jurídicos e legais efeitos.
+      </p>
+
+      <div className="text-center text-sm mb-10">
+        <p>{storeCity} - {storeState}, {formatDateLong(new Date().toISOString())}.</p>
       </div>
 
       {/* Assinaturas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mt-16">
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mt-6">
         {/* Locadora */}
         <div className="text-center">
-          <div className="border-t border-gray-400 pt-4">
-            <p className="font-bold uppercase tracking-wider">LOCADORA</p>
-            <p className="text-sm mt-2">{store.name}</p>
-            <p className="text-xs text-gray-500 mt-1">CNPJ: {store.cnpj || LESSOR_CNPJ}</p>
-            {store.owner_signature_url ? (
-              <img src={store.owner_signature_url} alt="Assinatura Locadora" className="mx-auto mt-4 max-h-20 object-contain" />
-            ) : (
-              store.digital_signature_base64 && (
-                <img src={`data:image/png;base64,${store.digital_signature_base64}`} alt="Assinatura Locadora" className="mx-auto mt-4 max-h-20" />
-              )
-            )}
+          {store.owner_signature_url ? (
+            <img
+              src={store.owner_signature_url}
+              alt="Assinatura Locadora"
+              className="mx-auto max-h-20 object-contain"
+            />
+          ) : (
+            store.digital_signature_base64 && (
+              <img
+                src={`data:image/png;base64,${store.digital_signature_base64}`}
+                alt="Assinatura Locadora"
+                className="mx-auto max-h-20"
+              />
+            )
+          )}
+          <div className="border-t border-gray-400 pt-3 mt-2">
+            <p className="font-bold uppercase tracking-wider">{LESSOR_LEGAL_NAME}</p>
+            <p className="text-sm mt-1">{LESSOR_TRADE_NAME}</p>
+            <p className="text-xs text-gray-500 mt-1">CNPJ: {lessorCnpj}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Representante Legal: {lessorRepresentative}
+            </p>
           </div>
         </div>
 
-        {/* Locatária */}
+        {/* Locatário */}
         <div className="text-center">
-          <div className="border-t border-gray-400 pt-4">
-            <p className="font-bold uppercase tracking-wider">LOCATÁRIA(O)</p>
-            <p className="text-sm mt-2">{customer?.name || '________________________________________'}</p>
-            <p className="text-xs text-gray-500 mt-1">CPF: {customer?.cpf || '________________'}</p>
-            <div id="signature-pad" className="mt-4 min-h-[100px] border-b border-gray-400 mx-auto max-w-xs" />
+          <div id="signature-pad" className="min-h-[80px]" />
+          <div className="border-t border-gray-400 pt-3 mt-2">
+            <p className="font-bold uppercase tracking-wider">{lesseeName}</p>
+            <p className="text-xs text-gray-500 mt-1">CPF: {lesseeCpf}</p>
+            <p className="text-sm mt-1 font-bold">LOCATÁRIO</p>
           </div>
         </div>
-      </div>
-
-      {/* Data e Local */}
-      <div className="text-center mt-10 text-sm">
-        <p>{storeCity} - {storeState}, {format(today, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}.</p>
       </div>
 
       {/* Ações */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex flex-wrap justify-center gap-3 shadow-lg" style={{ zIndex: 50 }}>
-        <button onClick={onPrint} className="px-6 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm flex items-center gap-2">
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex flex-wrap justify-center gap-3 shadow-lg"
+        style={{ zIndex: 50 }}
+      >
+        <button
+          onClick={onPrint}
+          className="px-6 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm flex items-center gap-2"
+        >
           🖨 Imprimir
         </button>
-        <button onClick={onSign} className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium text-sm flex items-center gap-2">
+        <button
+          onClick={onSign}
+          className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium text-sm flex items-center gap-2"
+        >
           ✍ Assinar Digitalmente
         </button>
-        <button onClick={onDownload} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm flex items-center gap-2">
-          ⬇ Baixar PDF
+        <button
+          onClick={onDownload}
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm flex items-center gap-2"
+        >
+          ⬇ Gerar PDF
         </button>
-        <button onClick={onSendEmail} className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm flex items-center gap-2">
+        <button
+          onClick={onSendEmail}
+          className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm flex items-center gap-2"
+        >
           📧 Enviar Email
         </button>
-        <button onClick={onSendWhatsApp} className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium text-sm flex items-center gap-2">
+        <button
+          onClick={onSendWhatsApp}
+          className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium text-sm flex items-center gap-2"
+        >
           💬 WhatsApp
         </button>
       </div>

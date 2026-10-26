@@ -169,13 +169,13 @@ export const rentalService = {
   // POST /contracts/:id/send-email - Enviar contrato por email (id = contractId)
   sendContractEmail: async (id: string, data: { email: string }) => {
     const response = await api.post(`/contracts/${id}/send-email`, data);
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   // POST /contracts/:id/send-whatsapp - Enviar contrato por WhatsApp (id = contractId)
   sendContractWhatsApp: async (id: string, data: { phone: string }) => {
     const response = await api.post(`/contracts/${id}/send-whatsapp`, data);
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   // GET /:id/contract/pdf - Baixar PDF do contrato
