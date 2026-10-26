@@ -7,6 +7,7 @@ import { AuthLayout } from '../components/layouts/AuthLayout';
 
 // Security Guard Import
 import { PrivateRoute } from '../components/PrivateRoute';
+import { PageLoading as Loading } from '../components/common/PageLoading';
 
 // --- Lazy Loading Pages ---
 
@@ -19,7 +20,8 @@ const ChangePassword = lazy(() => import('../pages/ChangePassword/index'));
 const NotFound = lazy(() => import('../pages/NotFound/index'));
 
 // Admin / System Pages
-const Dashboard = lazy(() => import('../pages/Dashboard/index'));
+const Dashboard = lazy(() => import('../pages/Dashboard/GeneralDashboard'));
+const LocalDashboard = lazy(() => import('../pages/Dashboard/LocalDashboard'));
 const Users = lazy(() => import('../pages/Users/index')); 
 const Stores = lazy(() => import('../pages/Stores/index'));
 const ClientPage = lazy(() => import('../pages/Clients/index')); 
@@ -38,13 +40,6 @@ const Customers = lazy(() => import('../pages/Customers/index'));
 
 // === SHOWROOM  ===
 const Showroom = lazy(() => import('../pages/Showroom/index')); 
-
-// Simple Loading Component
-const Loading = () => (
-  <div className="flex items-center justify-center h-screen bg-gray-50">
-    <div className="animate-pulse text-rose-600 font-semibold">Carregando...</div>
-  </div>
-);
 
 export const router = createBrowserRouter([
   // 1. PUBLIC ROUTE (LANDING PAGE)
@@ -104,6 +99,17 @@ export const router = createBrowserRouter([
               {
                 path: "/dashboard", 
                 element: (<Suspense fallback={<Loading />}><Dashboard /></Suspense>)
+              }
+            ]
+          },
+
+          // --- STORE DASHBOARD (Admin and Local Manager) ---
+          {
+            element: <PrivateRoute allowedRoles={['admin', 'local_manager']} />,
+            children: [
+              {
+                path: "/dashboard/local",
+                element: (<Suspense fallback={<Loading />}><LocalDashboard /></Suspense>)
               }
             ]
           },

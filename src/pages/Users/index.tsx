@@ -23,6 +23,7 @@ const roleLabels: Record<string, string> = {
   owner: 'Proprietário',
   attendant: 'Atendente',
   customer: 'Cliente',
+  local_manager: 'Gerente Local',
 };
 
 interface StoreData {
@@ -340,6 +341,7 @@ function Users() {
                     }
                   >
                     <option value="attendant">Atendente</option>
+                    <option value="local_manager">Gerente Local</option>
                     <option value="admin">Administrador</option>
                     <option value="owner">Proprietário</option>
                     <option value="customer">Cliente</option>
@@ -350,7 +352,7 @@ function Users() {
                     Loja Vínculo
                   </label>
                   <select
-                    required={formData.role === "attendant"}
+                    required={["attendant", "local_manager"].includes(formData.role)}
                     disabled={["customer", "admin", "owner"].includes(
                       formData.role,
                     )}

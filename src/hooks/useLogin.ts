@@ -50,6 +50,9 @@ export function useLogin() {
                 case 'owner':
                     navigate('/dashboard'); 
                     break;
+                case 'local_manager':
+                    navigate('/dashboard/local');
+                    break;
                 case 'attendant':
                     navigate('/rentals'); 
                     break;

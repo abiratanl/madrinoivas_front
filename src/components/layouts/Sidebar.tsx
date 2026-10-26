@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import UserProfileModal from '@/components/common/UserProfileModal';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  Menu, X, LayoutDashboard, Calendar, Image,
+  Menu, X, LayoutDashboard, Calendar, Image, Building2,
   Package, Tag, Contact2, Users as UsersIcon, UserCircle, LogOut, Store
 } from 'lucide-react';
 
@@ -12,6 +12,7 @@ const roleLabels: Record<string, string> = {
   owner: 'Proprietário',
   attendant: 'Atendente',
   customer: 'Cliente',
+  local_manager: 'Gerente Local',
 };
 
 export function Sidebar() {
@@ -31,10 +32,16 @@ export function Sidebar() {
   // Definição dos itens de menu baseados no perfil
   const menuItems = [
     {
-      label: 'Dashboard',
+      label: 'Dashboard Geral',
       path: '/dashboard',
       roles: ['owner', 'admin'],
       icon: <LayoutDashboard className="w-5 h-5" />
+    },
+    {
+      label: 'Dashboard Local',
+      path: '/dashboard/local',
+      roles: ['admin', 'local_manager'],
+      icon: <Building2 className="w-5 h-5" />
     },
     {
       label: 'Aluguéis',
@@ -124,7 +131,10 @@ export function Sidebar() {
             {menuItems
               .filter(item => item.roles.includes(userRole))
               .map((item) => {
-                const isActive = location.pathname.startsWith(item.path);
+                const isActive =
+                  item.path === '/dashboard' || item.path === '/dashboard/local'
+                    ? location.pathname === item.path
+                    : location.pathname.startsWith(item.path);
                 return (
                   <li key={item.path}>
                     <Link

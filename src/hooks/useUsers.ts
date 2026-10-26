@@ -6,7 +6,7 @@ export interface User {
   id: string; 
   name: string;
   email: string;
-  role: 'admin' | 'attendant' | 'owner' | 'customer';
+  role: 'admin' | 'attendant' | 'owner' | 'customer' | 'local_manager';
   is_active: boolean | number; // MySQL retorna 1/0
   store_id: string | null; 
   store_name?: string; 
@@ -94,9 +94,9 @@ export function useUsers() {
     const isGlobalRole = ['customer', 'admin', 'owner'].includes(formData.role);
     const finalStoreId = isGlobalRole ? null : (formData.store_id || null);
 
-    // Trava de segurança: Attendant deve ter loja obrigatoriamente
-    if (formData.role === 'attendant' && !formData.store_id) {
-      alert("Por favor, selecione uma loja para o atendente.");
+    // Trava de segurança: perfis operacionais devem ter loja obrigatoriamente
+    if (['attendant', 'local_manager'].includes(formData.role) && !formData.store_id) {
+      alert("Por favor, selecione uma loja para o usuário operacional.");
       return;
     }
 
