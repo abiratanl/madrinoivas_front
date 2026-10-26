@@ -113,7 +113,7 @@ export const storeService = {
    */
   getAll: async (showInactive = false) => {
     const response = await api.get('/stores', { params: { showInactive } });
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 
   /**

@@ -1129,10 +1129,14 @@ export default function Rentals() {
           payments={contractPayments}
           initialContractId={contractExistingId}
           onGenerateContract={async (rentalId, signatureBase64) => {
-            const response = await rentalService.generateContract(rentalId, { lessee_signature: signatureBase64 });
+            const draft = await rentalService.generateContractDraft(rentalId);
+            const signed = await rentalService.signContract(draft.id, {
+              lessee_signature: signatureBase64,
+            });
             return {
-              contractId: response.data?.id || response.id,
-              pdfUrl: response.data?.pdf_url || response.pdf_url,
+              contractId: signed.id,
+              pdfUrl: signed.pdf_url,
+              contractNumber: signed.contract_number ?? draft.contract_number ?? null,
             };
           }}
           onSendEmail={async (contractId, email) => {
@@ -1149,6 +1153,9 @@ export default function Rentals() {
           }}
           onSendPreviewEmail={async (rentalId, email) => {
             return rentalService.sendContractPreviewEmail(rentalId, { email });
+          }}
+          onCancelContract={async (contractId, notes) => {
+            return rentalService.cancelContract(contractId, notes);
           }}
         />
       )}

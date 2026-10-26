@@ -160,10 +160,28 @@ export const rentalService = {
 
   // CONTRATOS
   
-  // POST /:id/contract - Gerar contrato com assinatura
+  // POST /:id/contract - Gerar contrato com assinatura (fluxo legado)
   generateContract: async (id: string, data: { lessee_signature: string }) => {
     const response = await api.post(`/rentals/${id}/contract`, data);
     return response.data;
+  },
+
+  // POST /contracts/generate - Gerar e persistir o PDF original (draft) no R2
+  generateContractDraft: async (rentalId: string) => {
+    const response = await api.post('/contracts/generate', { rental_id: rentalId });
+    return response.data?.data || response.data;
+  },
+
+  // POST /contracts/:id/sign - Assinar o draft e persistir o PDF definitivo no R2
+  signContract: async (contractId: string, data: { lessee_signature: string }) => {
+    const response = await api.post(`/contracts/${contractId}/sign`, data);
+    return response.data?.data || response.data;
+  },
+
+  // POST /contracts/:id/cancel - Cancelar contrato (admin/owner/local_manager)
+  cancelContract: async (contractId: string, notes: string) => {
+    const response = await api.post(`/contracts/${contractId}/cancel`, { notes });
+    return response.data?.data || response.data;
   },
 
   // GET /:id/contract - Buscar o contrato assinado mais recente do aluguel
