@@ -227,7 +227,14 @@ describe('LocalDashboard', () => {
 
     expect(await screen.findByText('Dashboard da Loja')).toBeInTheDocument();
     expect(screen.getByText('Faturamento da loja')).toBeInTheDocument();
+    expect(screen.getByText('R$ 18.500,00')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 42.000,00').length).toBeGreaterThan(0);
     expect(screen.getByText('Recebimentos de hoje')).toBeInTheDocument();
+    expect(screen.getByText('R$ 500,00')).toBeInTheDocument();
+    expect(screen.getByText('R$ 4.700,00')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 900,00').length).toBeGreaterThan(0);
+    expect(screen.getByText(/R\$\s1\.500,00/)).toBeInTheDocument();
+    expect(screen.getByText('30.0%')).toBeInTheDocument();
     expect(screen.getAllByText('Pix').length).toBeGreaterThan(0);
     expect(screen.getByText('Cartão')).toBeInTheDocument();
     expect(screen.getAllByText('Dinheiro').length).toBeGreaterThan(0);

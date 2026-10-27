@@ -181,6 +181,16 @@ describe('GeneralDashboard', () => {
     expect(await screen.findByText('Dashboard Geral')).toBeInTheDocument();
     expect(await screen.findByText('Faturamento Recebido')).toBeInTheDocument();
     expect(screen.getByText('Ticket Médio')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 25.000,00').length).toBeGreaterThan(0);
+    expect(screen.getByText('R$ 2.500,00')).toBeInTheDocument();
+    expect(screen.getByText('R$ 8.000,00')).toBeInTheDocument();
+    expect(screen.getByText('R$ 1.200,00')).toBeInTheDocument();
+    expect(
+      screen.getByText('10 aluguéis criados • +25.0% vs período anterior'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('15.0% da carteira em aberto • 2 parcela(s) vencida(s)'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Evolução do Faturamento')).toBeInTheDocument();
     expect(screen.getByText('Formas de Pagamento')).toBeInTheDocument();
     expect(screen.getByText('Status dos Aluguéis')).toBeInTheDocument();
