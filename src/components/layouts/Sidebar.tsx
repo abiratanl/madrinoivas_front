@@ -13,6 +13,7 @@ const roleLabels: Record<string, string> = {
   attendant: 'Atendente',
   customer: 'Cliente',
   local_manager: 'Gerente Local',
+  gerente_local: 'Gerente Local',
 };
 
 export function Sidebar() {
@@ -46,44 +47,44 @@ export function Sidebar() {
     {
       label: 'Aluguéis',
       path: '/rentals',
-      roles: ['owner', 'attendant', 'admin'],
+      roles: ['owner', 'attendant', 'admin', 'local_manager'],
       icon: <Calendar className="w-5 h-5" />
-    },
-    {
-      label: 'Clientes',
-      path: '/customers',
-      roles: ['owner', 'attendant', 'admin'],
-      icon: <Contact2 className="w-5 h-5" />
-    },
-    {
-      label: 'Showroom',
-      path: '/showroom',
-      roles: ['owner', 'attendant', 'admin'],
-      icon: <Image className="w-5 h-5" />
-    },
-    {
-      label: 'Produtos',
-      path: '/products',
-      roles: ['owner', 'attendant', 'admin'],
-      icon: <Package className="w-5 h-5" />
     },
     {
       label: 'Categorias',
       path: '/categories',
-      roles: ['owner', 'attendant', 'admin'],
+      roles: ['owner', 'attendant', 'admin', 'local_manager'],
       icon: <Tag className="w-5 h-5" />
     },
     {
-      label: 'Usuários',
-      path: '/users',
-      roles: ['admin'],
-      icon: <UsersIcon className="w-5 h-5" />
+      label: 'Clientes',
+      path: '/customers',
+      roles: ['owner', 'attendant', 'admin', 'local_manager'],
+      icon: <Contact2 className="w-5 h-5" />
     },
     {
       label: 'Lojas',
       path: '/stores',
       roles: ['admin', 'owner'],
       icon: <Store className="w-5 h-5" />
+    },
+    {
+      label: 'Produtos',
+      path: '/products',
+      roles: ['owner', 'attendant', 'admin', 'local_manager'],
+      icon: <Package className="w-5 h-5" />
+    },
+    {
+      label: 'Showroom',
+      path: '/showroom',
+      roles: ['owner', 'attendant', 'admin', 'local_manager'],
+      icon: <Image className="w-5 h-5" />
+    },
+    {
+      label: 'Usuários',
+      path: '/users',
+      roles: ['admin'],
+      icon: <UsersIcon className="w-5 h-5" />
     },
     {
       label: 'Área do Cliente',

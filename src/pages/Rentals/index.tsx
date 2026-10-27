@@ -542,7 +542,9 @@ export default function Rentals() {
   const [cancellingPayment, setCancellingPayment] = useState<Payment | null>(null);
 
   const { selectedStore, user } = useAuth();
-  const canManagePayments = !!user?.role && ['admin', 'owner'].includes(user.role.toLowerCase());
+  const canManagePayments =
+    !!user?.role &&
+    ['admin', 'owner', 'local_manager'].includes(user.role.toLowerCase());
 
   const handleEditPayment = (payment: Payment) => {
     setEditingPayment(payment);
@@ -743,8 +745,9 @@ export default function Rentals() {
   const canReturn = (status: string) => ['picked_up', 'late'].includes(status);
   const canCancel = (status: string) => ['budget', 'reserved'].includes(status);
   const canDelete = (status: string, userRole?: string) => {
-    const isAdminOrOwner = userRole && ['admin', 'owner'].includes(userRole.toLowerCase());
-    return isAdminOrOwner && status === 'cancelled';
+    const canHardDelete =
+      userRole && ['admin', 'owner', 'local_manager'].includes(userRole.toLowerCase());
+    return !!canHardDelete && status === 'cancelled';
   };
   const canPay = (status: string) => ['budget', 'reserved', 'picked_up', 'late'].includes(status);
   const canMarkAsPickedUp = (status: string) => ['budget', 'reserved'].includes(status);

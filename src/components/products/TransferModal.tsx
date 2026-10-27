@@ -23,9 +23,16 @@ export function TransferModal({ isOpen, onClose, product, onSuccess }: TransferM
 
   const loadStores = useCallback(async () => {
     try {
-      // Attendants use /for-transfer endpoint, admins/owners use /stores
-      const isAttendant = user?.role?.toLowerCase() === 'attendant' || user?.role?.toLowerCase() === 'atendente';
-      const data = isAttendant ? await storeService.getForTransfer() : await storeService.getAll();
+      // Store-scoped roles use /for-transfer; admins/owners list all stores.
+      const role = user?.role?.toLowerCase();
+      const isStoreScoped =
+        role === 'attendant' ||
+        role === 'atendente' ||
+        role === 'local_manager' ||
+        role === 'gerente_local';
+      const data = isStoreScoped
+        ? await storeService.getForTransfer()
+        : await storeService.getAll();
       const storeList = Array.isArray(data) ? data : data.data || [];
       setStores(storeList);
     } catch (err) {

@@ -35,39 +35,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [availableStores, setAvailableStores] = useState<Store[]>([]);
 
   const loadStores = async (userData?: User) => {
-    // Use passed userData or fallback to state user (for signIn timing)
     const currentUser = userData || user;
+    const role = currentUser?.role?.toLowerCase();
+    const scopedRoles = ['local_manager', 'gerente_local', 'attendant', 'atendente'];
+    const isScopedUser = !!role && scopedRoles.includes(role) && !!currentUser?.store_id;
+
     let stores: Store[] = [];
     try {
-      stores = await storeService.getAll();
+      if (isScopedUser) {
+        const response = await storeService.getById(String(currentUser?.store_id));
+        const store = response?.data ?? response;
+        stores = store ? [store as Store] : [];
+      } else {
+        stores = await storeService.getAll();
+      }
       setAvailableStores(stores);
     } catch (error) {
       console.error('Erro ao carregar lojas:', error);
-      // Even if store loading fails, we should still allow the app to work
       setAvailableStores([]);
     }
 
-    // Restore selected store from localStorage
-    const savedStoreId = localStorage.getItem('@MadriNoivas:selectedStoreId');
-    if (savedStoreId && stores.length > 0) {
-      const store = stores.find((s: Store) => String(s.id) === savedStoreId);
-      if (store) setSelectedStoreState(store);
-    } else if (stores.length === 1) {
-      // Auto-select if only one store
-      setSelectedStoreState(stores[0]);
-      localStorage.setItem('@MadriNoivas:selectedStoreId', String(stores[0].id));
-    }
-    
-    // Auto-select store for attendants based on user.store_id from token
-    // This runs even if stores API failed, using user.store_id from token
-    if (!selectedStore && currentUser?.store_id) {
-      let userStore = stores.find((s: Store) => String(s.id) === String(currentUser.store_id));
-      
-      // If store not found in API response (e.g., API failed or user lacks permission),
-      // create a minimal store object from the token data
+    if (isScopedUser) {
+      let userStore = stores.find(
+        (store) => String(store.id) === String(currentUser?.store_id),
+      );
+
       if (!userStore) {
         userStore = {
-          id: currentUser.store_id,
+          id: String(currentUser?.store_id),
           name: 'Minha Loja',
           address: null,
           address_id: null,
@@ -80,9 +75,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           contacts: [],
         } as Store;
       }
-      
+
       setSelectedStoreState(userStore);
       localStorage.setItem('@MadriNoivas:selectedStoreId', String(userStore.id));
+      return;
+    }
+
+    const savedStoreId = localStorage.getItem('@MadriNoivas:selectedStoreId');
+    if (savedStoreId && stores.length > 0) {
+      const store = stores.find((item) => String(item.id) === savedStoreId);
+      if (store) {
+        setSelectedStoreState(store);
+        return;
+      }
+    }
+
+    if (stores.length === 1) {
+      setSelectedStoreState(stores[0]);
+      localStorage.setItem('@MadriNoivas:selectedStoreId', String(stores[0].id));
     }
   };
 
@@ -118,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('@MadriNoivas:token', token);
       localStorage.setItem('@MadriNoivas:user', JSON.stringify(userData));
       setUser(userData);
-      toast.success(`Bem-vinda, ${userData.name.split(' ')[0]}!`, {
+      toast.success(`Bem-vindo(a), ${userData.name.split(' ')[0]}!`, {
         style: { borderRadius: '10px', background: '#333', color: '#fff' }
       });
       console.log("🔐 Contexto: Login realizado com sucesso para role:", userData.role);
@@ -148,7 +158,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Admin/Proprietário sem loja selecionada precisa escolher
   // Atendentes usam automaticamente sua loja do token (user.store_id)
-  const needsStoreSelection = !!(user && ['admin', 'owner'].includes(user.role.toLowerCase()) && !selectedStore && availableStores.length > 0);
+  const needsStoreSelection = !!(
+    user &&
+    ['admin', 'owner', 'proprietario'].includes(user.role.toLowerCase()) &&
+    !selectedStore &&
+    availableStores.length > 0
+  );
 
   return (
     <AuthContext.Provider value={{ 

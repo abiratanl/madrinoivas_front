@@ -129,10 +129,10 @@ export const router = createBrowserRouter([
             ]
           },
 
-          // --- OPERATIONAL AREA (Admin, Owner, Attendant) ---
+          // --- OPERATIONAL AREA (Admin, Owner, Local Manager, Attendant) ---
           
           {
-            element: <PrivateRoute allowedRoles={['admin', 'owner', 'attendant']} />,
+            element: <PrivateRoute allowedRoles={['admin', 'owner', 'local_manager', 'attendant']} />,
             children: [
               {
                 path: "/rentals", 

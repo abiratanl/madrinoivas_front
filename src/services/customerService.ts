@@ -3,11 +3,14 @@ import { type Customer } from '../types/customer';
 
 export const customerService = {
   // 1. LISTAR CLIENTES (Usa a busca por Nome/CPF que você criou no Model)
-  getAll: async (search?: string, includeInactives: boolean = false): Promise<Customer[]> => {
+  getAll: async (
+    search?: string,
+    includeInactives: boolean = false,
+  ): Promise<Customer[]> => {
     // Montamos os parâmetros de consulta para a URL
     const params: Record<string, string | boolean> = {};
     if (search) params.search = search;
-    if (includeInactives) params.includeInactives = true; // Enviado como query string
+    if (includeInactives) params.includeInactives = true;
     
     // Faz a chamada à API: /customers?search=...&includeInactives=true
     const response = await api.get('/customers', { params });

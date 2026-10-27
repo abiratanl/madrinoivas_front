@@ -87,6 +87,12 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     return returnDate < today ? 'late' : rental.status;
   }, []);
 
+  useEffect(() => {
+    setHasLoadedCancelled(false);
+    setHasLoadedReturned(false);
+    setRentalDetailsCache({});
+  }, [selectedStore?.id]);
+
   const loadRentals = useCallback(async (filters?: { status?: string }) => {
     setLoading(true);
     try {
@@ -135,7 +141,10 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     if (hasLoadedCancelled || loadingCancelled) return;
     setLoadingCancelled(true);
     try {
-      const data = await rentalService.getAll({ status: 'cancelled' });
+      const data = await rentalService.getAll({
+        status: 'cancelled',
+        storeId: selectedStore?.id,
+      });
       const normalized = Array.isArray(data) ? data.map((r: Rental) => {
         // API não retorna customer_id, buscamos por nome
         const customer = customersRef.current.find(c => 
@@ -157,14 +166,17 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     } finally {
       setLoadingCancelled(false);
     }
-  }, [hasLoadedCancelled, loadingCancelled]);
+  }, [hasLoadedCancelled, loadingCancelled, selectedStore?.id]);
 
   // Carregar devolvidos sob demanda
   const loadReturnedRentals = useCallback(async () => {
     if (hasLoadedReturned || loadingReturned) return;
     setLoadingReturned(true);
     try {
-      const data = await rentalService.getAll({ status: 'returned' });
+      const data = await rentalService.getAll({
+        status: 'returned',
+        storeId: selectedStore?.id,
+      });
       const normalized = Array.isArray(data) ? data.map((r: Rental) => {
         // API não retorna customer_id, buscamos por nome
         const customer = customersRef.current.find(c => 
@@ -186,7 +198,7 @@ const [editingRentalId, setEditingRentalId] = useState<string | null>(null);
     } finally {
       setLoadingReturned(false);
     }
-  }, [hasLoadedReturned, loadingReturned]);
+  }, [hasLoadedReturned, loadingReturned, selectedStore?.id]);
 
   // Carregar detalhes completos de um aluguel sob demanda
   const loadRentalDetails = useCallback(async (id: string) => {

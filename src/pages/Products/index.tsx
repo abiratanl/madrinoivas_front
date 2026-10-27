@@ -21,7 +21,12 @@ function Products() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const isAttendant = user?.role?.toLowerCase() === 'attendant' || user?.role?.toLowerCase() === 'atendente';
+  const userRole = user?.role?.toLowerCase();
+  const isStoreScoped =
+    userRole === 'attendant' ||
+    userRole === 'atendente' ||
+    userRole === 'local_manager' ||
+    userRole === 'gerente_local';
 
   // Modal states
   const [transferProduct, setTransferProduct] = useState<Product | null>(null);
@@ -108,12 +113,12 @@ function Products() {
     loadCategories();
   }, []);
 
-  // Force isGlobal = false for attendant
+  // Global consolidated view is exclusive to admin/owner.
   useEffect(() => {
-    if (isAttendant && isGlobal) {
+    if (isStoreScoped && isGlobal) {
       setIsGlobal(false);
     }
-  }, [isAttendant, isGlobal]);
+  }, [isStoreScoped, isGlobal]);
 
   // Reload products if filter or global checkbox changes
   useEffect(() => {
@@ -497,8 +502,8 @@ function Products() {
             <option value="discarded">Descartado</option>
           </select>
 
-          {/* Checkbox Busca Global - oculto para atendente */}
-          {!isAttendant && (
+          {/* Checkbox Busca Global - exclusivo de admin/owner */}
+          {!isStoreScoped && (
             <label className="flex items-center gap-2 cursor-pointer bg-white hover:bg-gray-50 px-3 py-2 rounded border border-gray-300 shadow-sm transition-colors">
               <input
                 type="checkbox"
@@ -688,7 +693,7 @@ function Products() {
           {!loading && products.length === 0 && (
             <div className="p-10 text-center text-gray-500 bg-white">
               <p>Nenhum produto encontrado com os filtros atuais.</p>
-              {!isAttendant && isGlobal === false && (
+              {!isStoreScoped && isGlobal === false && (
                 <p className="text-xs mt-2 text-gray-400">
                   Tente marcar "Ver Todas as Lojas".
                 </p>

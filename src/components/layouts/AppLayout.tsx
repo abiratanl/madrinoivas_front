@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { StoreSwitcher } from '../StoreSwitcher';
 
 export const AppLayout = () => {
   return (
@@ -10,11 +11,11 @@ export const AppLayout = () => {
       {/* Right Side: Main Content */}
       <main className="flex-1 p-8 overflow-auto">
         {/* Header mobile could go here */}
-        <header className="mb-8 flex justify-between items-center">
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-2xl font-bold text-gray-800">
             Painel de Controle
           </h2>
-          {/* Notification icons or Profile Avatar could go here */}
+          <StoreSwitcher />
         </header>
 
         {/* Dynamic Page Content */}

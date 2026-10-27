@@ -23,8 +23,15 @@ export function EditTransferModal({ isOpen, onClose, transfer, onSuccess }: Edit
 
   const loadStores = useCallback(async () => {
     try {
-      const isAttendant = user?.role?.toLowerCase() === 'attendant' || user?.role?.toLowerCase() === 'atendente';
-      const data = isAttendant ? await storeService.getForTransfer() : await storeService.getAll();
+      const role = user?.role?.toLowerCase();
+      const isStoreScoped =
+        role === 'attendant' ||
+        role === 'atendente' ||
+        role === 'local_manager' ||
+        role === 'gerente_local';
+      const data = isStoreScoped
+        ? await storeService.getForTransfer()
+        : await storeService.getAll();
       const storeList = Array.isArray(data) ? data : data.data || [];
       setStores(storeList);
     } catch (err) {

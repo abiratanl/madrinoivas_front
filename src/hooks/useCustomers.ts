@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { customerService } from '../services/customerService';
 import type { Customer, Contact, Address } from '../types/customer';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 export function useCustomers() {
+  const { selectedStore, user } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -30,22 +32,24 @@ export function useCustomers() {
 
   const [formData, setFormData] = useState<Partial<Customer>>(initialFormState);
 
+  const loadCustomers = useCallback(
+    async (search?: string, includeInactives: boolean = false) => {
+      setLoading(true);
+      try {
+        const data = await customerService.getAll(search, includeInactives);
+        setCustomers(data);
+      } catch {
+        toast.error('Erro ao carregar dados.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     loadCustomers();
-  }, []);
-
-  const loadCustomers = async (search?: string, includeInactives: boolean = false) => {
-  setLoading(true);
-  try {
-    // Passamos o objeto de filtros para o service
-    const data = await customerService.getAll(search, includeInactives);
-    setCustomers(data);
-  } catch {
-    toast.error("Erro ao carregar dados.");
-  } finally {
-    setLoading(false);
-  }
-};
+  }, [loadCustomers]);
 
   // --- Funções Auxiliares para Listas Dinâmicas ---
 
@@ -142,7 +146,8 @@ export function useCustomers() {
       await customerService.update(formData.id, formData);
       toast.success('Sucesso!', { id: loadingToast });
     } else {
-      await customerService.create(formData);
+      const storeId = formData.store_id || selectedStore?.id || user?.store_id;
+      await customerService.create({ ...formData, store_id: storeId });
       toast.success('Sucesso!', { id: loadingToast });
     }
 

@@ -38,6 +38,7 @@ export interface CustomerMeasurements {
 // 4. Interface Principal (Baseado na tabela 'customers')
 export interface Customer {
   id: string;
+  store_id?: string;
   name: string;
   rg?: string;
   cpf?: string;
