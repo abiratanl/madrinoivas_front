@@ -160,13 +160,14 @@ export function Collection() {
                 <div className="flex-grow"></div>
 
                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                  {/*
                   <div className="flex flex-col">
                     <span className="text-xs text-gray-500">Valor do Aluguel</span>
                     <span className="text-xl font-bold text-rose-600">
                       {formatMoney(product.rental_price)}
                     </span>
                   </div>
-
+                 */}
                   <Link
                     to="/auth/login"
                     className="h-10 w-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors"

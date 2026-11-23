@@ -73,8 +73,8 @@ export function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyModalProps)
             <ul className="list-disc list-inside space-y-1 text-gray-600 ml-4">
               <li><strong>Razão Social:</strong> Tech Siblings Soluções</li>
               <li><strong>CNPJ:</strong> [00.000.000/0000-00]</li>
-              <li><strong>Endereço:</strong> Rua Maria do Carmo Guimarães de Castro, 122 Residencial Nino - Guaratinguetá-SP</li>
-              <li><strong>E-mail de Contato:</strong> faleconosco@madrinoivas.com.br</li>
+              <li><strong>Endereço:</strong> Rua Dr. Castro Santos, 98 - Centro - Guaratinguetá-SP</li>
+              <li><strong>E-mail de Contato:</strong> faleconosco.gta@madrinoivas.com.br</li>
             </ul>
           </section>
 
@@ -173,7 +173,7 @@ export function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyModalProps)
               <li>Revogação do consentimento.</li>
             </ul>
             <p className="text-gray-600 mt-4">
-              Para exercer seus direitos, entre em contato pelo e-mail <a href="mailto:faleconosco@madrinoivas.com.br" className="text-madriGold hover:underline">faleconosco@madrinoivas.com.br</a>.
+              Para exercer seus direitos, entre em contato pelo e-mail <a href="mailto:faleconosco.gta@madrinoivas.com.br" className="text-madriGold hover:underline">faleconosco.gta@madrinoivas.com.br</a>.
             </p>
           </section>
 

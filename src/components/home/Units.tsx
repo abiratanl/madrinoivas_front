@@ -1,4 +1,4 @@
-import { MapPin, Phone, Mail, Clock, Navigation2, ExternalLink } from 'lucide-react';
+import { MapPin, Phone, Mail, Navigation2, ExternalLink, MessageSquare, Instagram, Facebook } from 'lucide-react';
 
 interface Unit {
   id: number;
@@ -7,38 +7,46 @@ interface Unit {
   neighborhood: string;
   city: string;
   phone: string;
+  whatsapp?: string;
   email: string;
-  hours: string;
+  facebook: string;
+  instagram: string;
   mapUrl: string;
   mapEmbedUrl: string;
   image: string;
 }
 
+const FACEBOOK_URL = 'https://www.facebook.com/lojamadrinoivas/?locale=pt_BR';
+const INSTAGRAM_URL = 'https://www.instagram.com/madrinoivas/';
+
 const units: Unit[] = [
   {
     id: 1,
-    name: 'Unidade Guaratinguetá-SP',
-    address: 'Rua Maria do Carmo Guimarães de Castro, 122',
-    neighborhood: 'Residencial Nino',
+    name: 'Madri Noivas - Guaratinguetá',
+    address: 'Rua Dr. Castro Santos, 98',
+    neighborhood: 'Centro',
     city: 'Guaratinguetá - SP',
-    phone: '(12) 3123-4567',
-    email: 'guaratingueta@madrinoivas.com.br',
-    hours: 'Seg a Sex: 9h às 18h | Sáb: 9h às 14h',
-    mapUrl: 'https://www.google.com/maps/search/?api=1&query=Rua+Maria+do+Carmo+Guimar%C3%A3es+de+Castro,+122,+Guaratinguet%C3%A1,+SP',
-    mapEmbedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3656.123456789!2d-45.123456!3d-22.812345!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94c8d123456789ab%3A0x123456789abcdef!2sRua%20Maria%20do%20Carmo%20Guimar%C3%A3es%20de%20Castro%2C%20122%20-%20Residencial%20Nino%2C%20Guaratinguet%C3%A1%20-%20SP!5e0!3m2!1spt-BR!2sbr!4v1234567890',
+    phone: '(12) 3133-7543',
+    whatsapp: '(12) 98133-9322',
+    email: 'faleconosco.gta@madrinoivas.com.br',
+    facebook: FACEBOOK_URL,
+    instagram: INSTAGRAM_URL,
+    mapUrl: 'https://www.google.com/maps/search/?api=1&query=Rua+Dr.+Castro+Santos,+98,+Centro,+Guaratinguet%C3%A1,+SP',
+    mapEmbedUrl: 'https://www.google.com/maps?q=Rua%20Dr.%20Castro%20Santos%2C%2098%2C%20Centro%2C%20Guaratinguet%C3%A1%2C%20SP&output=embed',
     image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80',
   },
   {
     id: 2,
-    name: 'Unidade Cruzeiro-SP',
-    address: 'Avenida Principal, 456',
+    name: 'Madri Noivas - Cruzeiro',
+    address: 'Rua Othon Barcelos (Dr. Orthon Barcelos), 280',
     neighborhood: 'Centro',
     city: 'Cruzeiro - SP',
-    phone: '(12) 3123-7890',
-    email: 'cruzeiro@madrinoivas.com.br',
-    hours: 'Seg a Sex: 9h às 18h | Sáb: 9h às 13h',
-    mapUrl: 'https://www.google.com/maps/search/?api=1&query=Avenida+Principal,+456,+Centro,+Cruzeiro,+SP',
-    mapEmbedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3656.123456789!2d-44.987654!3d-22.567890!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94c8d987654321ab%3A0xfedcba9876543210!2sAvenida%20Principal%2C%20456%20-%20Centro%2C%20Cruzeiro%20-%20SP!5e0!3m2!1spt-BR!2sbr!4v1234567890',
+    phone: '(12) 3143-6987',
+    email: 'faleconosco.cruzeiro@madrinoivas.com.br',
+    facebook: FACEBOOK_URL,
+    instagram: INSTAGRAM_URL,
+    mapUrl: 'https://www.google.com/maps/search/?api=1&query=Rua+Othon+Barcelos,+280,+Centro,+Cruzeiro,+SP',
+    mapEmbedUrl: 'https://www.google.com/maps?q=Rua%20Othon%20Barcelos%2C%20280%2C%20Centro%2C%20Cruzeiro%2C%20SP&output=embed',
     image: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=800&q=80',
   },
 ];
@@ -127,14 +135,53 @@ export function Units() {
                     </a>
                   </div>
 
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                    <div className="w-10 h-10 rounded-lg bg-madriGold/10 flex items-center justify-center">
-                      <Clock className="w-5 h-5 text-madriGold" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Horário de Funcionamento</p>
-                      <p className="font-medium text-gray-900">{unit.hours}</p>
-                    </div>
+                  {unit.whatsapp && (
+                    <a
+                      href={`https://wa.me/55${unit.whatsapp.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-green-50 hover:border-green-200 border border-gray-100 transition-all"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                        <MessageSquare className="w-5 h-5 text-green-600" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">WhatsApp</p>
+                        <p className="font-medium text-gray-900">{unit.whatsapp}</p>
+                      </div>
+                    </a>
+                  )}
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <a
+                      href={unit.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-madriGold/5 hover:border-madriGold/20 border border-gray-100 transition-all"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-madriGold/10 flex items-center justify-center">
+                        <Instagram className="w-5 h-5 text-madriGold" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Instagram</p>
+                        <p className="font-medium text-gray-900">@madrinoivas</p>
+                      </div>
+                    </a>
+
+                    <a
+                      href={unit.facebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-madriGold/5 hover:border-madriGold/20 border border-gray-100 transition-all"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-madriGold/10 flex items-center justify-center">
+                        <Facebook className="w-5 h-5 text-madriGold" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Facebook</p>
+                        <p className="font-medium text-gray-900">Madri Noivas</p>
+                      </div>
+                    </a>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">

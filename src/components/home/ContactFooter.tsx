@@ -17,23 +17,51 @@ export function ContactFooter({ onPrivacyPolicyClick }: ContactFooterProps) {
   const contactInfo = [
     {
       icon: MapPin,
-      title: 'Endereço Principal',
-      content: 'Rua Maria do Carmo Guimarães de Castro, 122 - Residencial Nino, Guaratinguetá - SP',
-      action: () => copyToClipboard('Rua Maria do Carmo Guimarães de Castro, 122 - Residencial Nino, Guaratinguetá - SP', 'endereço'),
+      title: 'Endereço - Guaratinguetá',
+      content: 'Rua Dr. Castro Santos, 98 - Centro, Guaratinguetá - SP',
+      action: () => copyToClipboard('Rua Dr. Castro Santos, 98 - Centro, Guaratinguetá - SP', 'endereço'),
       actionLabel: 'Copiar endereço',
     },
     {
       icon: Phone,
-      title: 'Telefone',
-      content: '(12) 3123-4567',
-      action: () => copyToClipboard('(12) 3123-4567', 'telefone'),
+      title: 'Telefone - Guaratinguetá',
+      content: '(12) 3133-7543',
+      action: () => copyToClipboard('(12) 3133-7543', 'telefone'),
+      actionLabel: 'Copiar telefone',
+    },
+    {
+      icon: MessageSquare,
+      title: 'WhatsApp - Guaratinguetá',
+      content: '(12) 98133-9322',
+      action: () => copyToClipboard('(12) 98133-9322', 'WhatsApp'),
+      actionLabel: 'Copiar WhatsApp',
+    },
+    {
+      icon: Mail,
+      title: 'E-mail - Guaratinguetá',
+      content: 'faleconosco.gta@madrinoivas.com.br',
+      action: () => copyToClipboard('faleconosco.gta@madrinoivas.com.br', 'e-mail'),
+      actionLabel: 'Copiar e-mail',
+    },
+    {
+      icon: MapPin,
+      title: 'Endereço - Cruzeiro',
+      content: 'Rua Dr Othon Barcelos, 280 - Centro, Cruzeiro - SP',
+      action: () => copyToClipboard('Rua Dr. Othon Barcelos, 280 - Centro, Cruzeiro - SP', 'endereço'),
+      actionLabel: 'Copiar endereço',
+    },
+    {
+      icon: Phone,
+      title: 'Telefone - Cruzeiro',
+      content: '(12) 3143-6987',
+      action: () => copyToClipboard('(12) 3143-6987', 'telefone'),
       actionLabel: 'Copiar telefone',
     },
     {
       icon: Mail,
-      title: 'E-mail Institucional',
-      content: 'faleconosco@madrinoivas.com.br',
-      action: () => copyToClipboard('faleconosco@madrinoivas.com.br', 'e-mail'),
+      title: 'E-mail - Cruzeiro',
+      content: 'faleconosco.cruzeiro@madrinoivas.com.br',
+      action: () => copyToClipboard('faleconosco.cruzeiro@madrinoivas.com.br', 'e-mail'),
       actionLabel: 'Copiar e-mail',
     },
   ];
@@ -42,13 +70,13 @@ export function ContactFooter({ onPrivacyPolicyClick }: ContactFooterProps) {
     {
       name: 'Instagram',
       icon: Instagram,
-      url: 'https://instagram.com/madrinoivas',
+      url: 'https://www.instagram.com/madrinoivas/',
       color: 'hover:text-pink-600',
     },
     {
       name: 'Facebook',
       icon: Facebook,
-      url: 'https://facebook.com/madrinoivas',
+      url: 'https://www.facebook.com/lojamadrinoivas/?locale=pt_BR',
       color: 'hover:text-blue-600',
     },
   ];
@@ -105,7 +133,7 @@ export function ContactFooter({ onPrivacyPolicyClick }: ContactFooterProps) {
               ))}
 
               <a
-                href="https://wa.me/5512999999999"
+                href="https://wa.me/5512981339322"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group inline-flex items-center gap-3 px-8 py-4 bg-green-600 text-white font-semibold rounded-full hover:bg-green-700 hover:shadow-lg transition-all"

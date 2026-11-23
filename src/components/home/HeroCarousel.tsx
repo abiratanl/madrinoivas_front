@@ -109,7 +109,7 @@ export function HeroCarousel() {
                     <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                   </a>
                   <a
-                    href="https://wa.me/5512999999999"
+                    href="https://wa.me/5512981339322"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-8 py-4 text-base font-semibold text-white border-2 border-white rounded-full hover:bg-white/10 hover:shadow-xl transition-all duration-300"
