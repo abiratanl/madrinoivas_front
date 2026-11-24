@@ -27,9 +27,13 @@ api.interceptors.response.use(
   (error) => {
     // Comprehensive error handling
     if (error.response?.status === 401) {
-      // change-password legitimately returns 401 for a wrong current password;
-      // that must not clear the session
-      if (error.config?.url?.includes('/change-password')) {
+      // change-password legitimately returns 401 for a wrong current password,
+      // and login returns 401 for invalid credentials;
+      // those must not clear the session nor redirect
+      if (
+        error.config?.url?.includes('/change-password') ||
+        error.config?.url?.includes('/auth/login')
+      ) {
         return Promise.reject(error);
       }
       // Ex: Redirect to login if token expires.
@@ -37,8 +41,8 @@ api.interceptors.response.use(
       localStorage.removeItem('@MadriNoivas:token');
       localStorage.removeItem('@MadriNoivas:user');
       delete api.defaults.headers.common['Authorization'];
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (window.location.pathname !== '/auth/login') {
+        window.location.href = '/auth/login';
       }
     }
     return Promise.reject(error);
